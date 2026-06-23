@@ -19,7 +19,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "memory"
-database_id = "PLACEHOLDER_RUN_wrangler_d1_create_memory"
+database_id = "886eb3e6-5fc6-4b1c-8703-856b76103b57"
 
 # Secrets (set with `wrangler secret put <NAME>` — never in client code):
 #   CLAUDE_API_KEY   the Claude API key (spec §10.9). If unset, the app falls
