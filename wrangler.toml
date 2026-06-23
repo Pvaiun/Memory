@@ -1,0 +1,31 @@
+# Cloudflare Worker: the API layer AND the Claude proxy (single backend, reused
+# unchanged when the app is later wrapped natively — see spec §8).
+name = "memory"
+main = "worker/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# The PWA is served as static assets from the same Worker. Non-/api requests
+# fall through to these assets; not_found_handling makes it a real SPA.
+[assets]
+directory = "./dist/client"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# D1 (SQLite) — the data store. Server-side, so the schema survives the
+# PWA -> native port untouched. Create with:
+#   wrangler d1 create memory
+# then paste the printed database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "memory"
+database_id = "PLACEHOLDER_RUN_wrangler_d1_create_memory"
+
+# Secrets (set with `wrangler secret put <NAME>` — never in client code):
+#   CLAUDE_API_KEY   the Claude API key (spec §10.9). If unset, the app falls
+#                    back to deterministic capture + heuristic summaries.
+#   AUTH_TOKEN       optional single-user bearer token (spec §8 "Do not
+#                    overbuild auth"). If unset, the API is open (fine for
+#                    local dev / Cloudflare Access-fronted deploys).
+[vars]
+CLAUDE_MODEL = "claude-opus-4-8"

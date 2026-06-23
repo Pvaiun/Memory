@@ -1,0 +1,33 @@
+{
+  "name": "memory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Memory — a personal contextual second brain (Phase 1 PWA on Cloudflare).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "db:init:local": "wrangler d1 execute memory --local --file=./schema.sql",
+    "db:init:remote": "wrangler d1 execute memory --remote --file=./schema.sql",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "framer-motion": "^11.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241106.0",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2",
+    "vitest": "^2.0.5",
+    "wrangler": "^3.84.0"
+  }
+}
