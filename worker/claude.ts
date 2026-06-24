@@ -57,6 +57,23 @@ function localDate(tz?: string): LocalDate {
   return { today, iso, timezone: zone, utc_offset };
 }
 
+// The next N calendar days as "Weekday YYYY-MM-DD", so the AI resolves weekday
+// names ("Thursday") and "next <weekday>" by LOOKUP instead of arithmetic —
+// which it gets wrong (it stored "Thursday" a day late). Enumerated on the
+// civil date with UTC math, so it is immune to DST.
+function upcomingDays(iso: string, n: number): string[] {
+  const [y, mo, d] = iso.split("-").map(Number);
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const dt = new Date(Date.UTC(y, mo - 1, d + i));
+    const wd = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", weekday: "long" }).format(dt);
+    const ds = dt.toISOString().slice(0, 10);
+    const label = i === 0 ? " (today)" : i === 1 ? " (tomorrow)" : "";
+    out.push(`${wd} ${ds}${label}`);
+  }
+  return out;
+}
+
 // Convert the model's ISO date string (or a legacy epoch number) to epoch ms.
 function toEpoch(v: unknown): number | null {
   if (v == null) return null;
@@ -133,12 +150,14 @@ Use "fact" for stable info (allergies, preferences, codes). Use "task" for
 things to do; set due_date only if a time is clearly implied. Use "date" with
 event_date for events.
 
-The user message includes "today" (the current local date and weekday),
-"timezone", and "utc_offset". Resolve EVERY relative date — "today",
-"tomorrow", "next Wednesday", "in two weeks", "this Friday" — against "today"
-in that timezone. Do NOT use any other assumption about the current date.
-Return due_date and event_date as full ISO 8601 timestamps that INCLUDE the
-given utc_offset, e.g. "2026-07-01T09:00:00-04:00". If only a day is known,
+The user message includes "today" (current local date + weekday), "timezone",
+"utc_offset", and "calendar" — an array of the next 14 days as
+"Weekday YYYY-MM-DD". To resolve ANY date reference — a weekday name
+("Thursday", "this Friday", "next Monday"), "today"/"tomorrow", or "in N days" —
+look it up in "calendar" and copy that exact date. Do NOT compute weekdays
+yourself; you miscount them. For dates beyond 14 days, count forward from
+today. Return due_date and event_date as full ISO 8601 timestamps that INCLUDE
+the given utc_offset, e.g. "2026-07-01T09:00:00-04:00". If only a day is known,
 use 09:00 local time. Use null when no date is implied.`;
 
 export async function proposeCapture(
@@ -155,6 +174,7 @@ export async function proposeCapture(
     today: `${today} (${iso})`,
     timezone,
     utc_offset,
+    calendar: upcomingDays(iso, 14),
     text,
     spaces: spaceList,
   });
