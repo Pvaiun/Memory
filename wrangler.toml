@@ -28,4 +28,4 @@ database_id = "886eb3e6-5fc6-4b1c-8703-856b76103b57"
 #                    overbuild auth"). If unset, the API is open (fine for
 #                    local dev / Cloudflare Access-fronted deploys).
 [vars]
-CLAUDE_MODEL = "claude-opus-4-8"
+CLAUDE_MODEL = "claude-sonnet-4-6"
