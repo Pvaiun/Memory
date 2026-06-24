@@ -10,6 +10,61 @@ import { localPropose } from "./local-capture";
 
 const API = "https://api.anthropic.com/v1/messages";
 
+// The AI is bad at reading raw epoch-ms as a date (and epoch is UTC, while the
+// user thinks in local time). So we hand it an unambiguous, human-readable
+// LOCAL date plus the timezone and UTC offset, and have it return ISO strings
+// that include that offset — which the server then converts to epoch with a
+// plain Date.parse. The timezone arrives from the client via the x-tz header.
+interface LocalDate {
+  today: string; // e.g. "Wednesday, 24 June 2026"
+  iso: string; // e.g. "2026-06-24"
+  timezone: string; // IANA, e.g. "America/New_York"
+  utc_offset: string; // e.g. "-04:00"
+}
+
+function localDate(tz?: string): LocalDate {
+  const zone = tz || "UTC";
+  const now = new Date();
+  let today: string, iso: string, utc_offset = "+00:00";
+  try {
+    today = new Intl.DateTimeFormat("en-GB", {
+      timeZone: zone,
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(now);
+    iso = new Intl.DateTimeFormat("en-CA", {
+      timeZone: zone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(now); // en-CA => YYYY-MM-DD
+    const offPart = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      timeZoneName: "longOffset",
+    })
+      .formatToParts(now)
+      .find((p) => p.type === "timeZoneName")?.value;
+    const m = offPart?.match(/GMT([+-]\d{2}):?(\d{2})/);
+    if (m) utc_offset = `${m[1]}:${m[2]}`;
+  } catch {
+    // Unknown timezone -> fall back to UTC.
+    today = now.toUTCString();
+    iso = now.toISOString().slice(0, 10);
+    utc_offset = "+00:00";
+  }
+  return { today, iso, timezone: zone, utc_offset };
+}
+
+// Convert the model's ISO date string (or a legacy epoch number) to epoch ms.
+function toEpoch(v: unknown): number | null {
+  if (v == null) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  const t = Date.parse(String(v));
+  return Number.isNaN(t) ? null : t;
+}
+
 async function callClaude(
   env: Env,
   system: string,
@@ -48,28 +103,49 @@ Reply with ONLY a JSON object, no prose, matching exactly:
   "block": {
     "type": "fact|task|checklist_item|note|contact|date",
     "content": { ... },        // e.g. {"key","value"} for fact; {"text"} for task/note; {"name","phone"|"email"} for contact; {"title"} for date
-    "due_date": <epoch ms | null>,
-    "event_date": <epoch ms | null>
+    "due_date": <ISO 8601 string with the given utc_offset, or null>,
+    "event_date": <ISO 8601 string with the given utc_offset, or null>
   },
   "confidence": 0.0-1.0
 }
 Use "fact" for stable info (allergies, preferences, codes). Use "task" for
 things to do; set due_date only if a time is clearly implied. Use "date" with
-event_date for events. Resolve relative dates against the provided "now".`;
+event_date for events.
+
+The user message includes "today" (the current local date and weekday),
+"timezone", and "utc_offset". Resolve EVERY relative date — "today",
+"tomorrow", "next Wednesday", "in two weeks", "this Friday" — against "today"
+in that timezone. Do NOT use any other assumption about the current date.
+Return due_date and event_date as full ISO 8601 timestamps that INCLUDE the
+given utc_offset, e.g. "2026-07-01T09:00:00-04:00". If only a day is known,
+use 09:00 local time. Use null when no date is implied.`;
 
 export async function proposeCapture(
   env: Env,
   text: string,
   spaces: SpaceWithBlocks[],
+  tz?: string,
 ): Promise<CaptureProposal> {
   if (!env.CLAUDE_API_KEY) return localPropose(text, spaces);
 
   const spaceList = spaces.map((s) => ({ id: s.id, title: s.title, type: s.type }));
-  const user = JSON.stringify({ now: Date.now(), text, spaces: spaceList });
+  const { today, iso, timezone, utc_offset } = localDate(tz);
+  const user = JSON.stringify({
+    today: `${today} (${iso})`,
+    timezone,
+    utc_offset,
+    text,
+    spaces: spaceList,
+  });
   try {
     const raw = await callClaude(env, CAPTURE_SYSTEM, user, 700);
     const parsed = extractJson(raw) as CaptureProposal | null;
-    if (parsed && parsed.target_space && parsed.block) return parsed;
+    if (parsed && parsed.target_space && parsed.block) {
+      // The model returns ISO date strings; normalize to epoch ms for storage.
+      parsed.block.due_date = toEpoch(parsed.block.due_date);
+      parsed.block.event_date = toEpoch(parsed.block.event_date);
+      return parsed;
+    }
     return localPropose(text, spaces);
   } catch {
     return localPropose(text, spaces); // never block capture on the AI (spec §5)
@@ -80,15 +156,20 @@ const SUMMARY_SYSTEM = `You maintain a living summary for a Space in a personal
 second brain. Write the top ~3 things the user needs to know about this Space
 RIGHT NOW, as one short glanceable line (no markdown, no preamble). Lead with
 what is most urgent or time-sensitive. Be terse — this is read in a five-second
-glance. If there is nothing meaningful, reply with an empty string.`;
+glance. If there is nothing meaningful, reply with an empty string.
+The payload includes "today" (current local date) and "timezone"; judge what is
+urgent or time-sensitive relative to that date, never any other assumption.`;
 
 export async function generateSummary(
   env: Env,
   space: SpaceWithBlocks,
+  tz?: string,
 ): Promise<string> {
   if (!env.CLAUDE_API_KEY) return heuristicSummary(space, Date.now());
+  const { today, iso, timezone } = localDate(tz);
   const payload = JSON.stringify({
-    now: Date.now(),
+    today: `${today} (${iso})`,
+    timezone,
     title: space.title,
     type: space.type,
     blocks: space.blocks.map((b) => ({

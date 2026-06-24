@@ -10,9 +10,20 @@ import type {
 // Optional single-user bearer token, mirrors the Worker's AUTH_TOKEN (spec §8).
 const TOKEN = import.meta.env.VITE_AUTH_TOKEN as string | undefined;
 
+// The device's IANA timezone, so the AI resolves relative dates ("next
+// Wednesday") against the user's local date rather than the Worker's UTC.
+const TZ = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+})();
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (TOKEN) headers.authorization = `Bearer ${TOKEN}`;
+  if (TZ) headers["x-tz"] = TZ;
   const res = await fetch(`/api${path}`, { ...init, headers });
   if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || res.statusText);
   return res.json() as Promise<T>;

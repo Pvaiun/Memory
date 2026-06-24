@@ -53,6 +53,9 @@ export default {
 async function route(request: Request, env: Env, url: URL): Promise<Response> {
   const path = url.pathname;
   const m = request.method;
+  // The client sends its IANA timezone so the AI resolves relative dates
+  // ("next Wednesday") against the user's local date, not UTC (spec §5).
+  const tz = request.headers.get("x-tz") || undefined;
 
   // GET /api/state  -> all non-archived spaces with their blocks
   if (path === "/api/state" && m === "GET") {
@@ -78,7 +81,7 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
     const { text } = (await request.json()) as { text?: string };
     if (!text || !text.trim()) return bad("empty capture");
     const spaces = await loadSpaces(env, false);
-    const proposal = await proposeCapture(env, text.trim(), spaces);
+    const proposal = await proposeCapture(env, text.trim(), spaces, tz);
     return json({ proposal });
   }
 
@@ -97,15 +100,15 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
   // /api/spaces/:id/blocks  -> add a block
   const blocksMatch = path.match(/^\/api\/spaces\/([^/]+)\/blocks$/);
   if (blocksMatch && m === "POST") {
-    return json(await addBlock(env, blocksMatch[1], await request.json()));
+    return json(await addBlock(env, blocksMatch[1], await request.json(), tz));
   }
 
   // /api/blocks/:id
   const blockMatch = path.match(/^\/api\/blocks\/([^/]+)$/);
   if (blockMatch) {
     const id = blockMatch[1];
-    if (m === "PATCH") return json(await patchBlock(env, id, await request.json()));
-    if (m === "DELETE") return json(await deleteBlock(env, id));
+    if (m === "PATCH") return json(await patchBlock(env, id, await request.json(), tz));
+    if (m === "DELETE") return json(await deleteBlock(env, id, tz));
   }
 
   return bad("not found", 404);
@@ -233,7 +236,12 @@ async function patchSpace(env: Env, id: string, body: Partial<Space>): Promise<S
   return (await env.DB.prepare("SELECT * FROM spaces WHERE id = ?").bind(id).first<Space>())!;
 }
 
-async function addBlock(env: Env, spaceId: string, body: Partial<Block>): Promise<Block> {
+async function addBlock(
+  env: Env,
+  spaceId: string,
+  body: Partial<Block>,
+  tz?: string,
+): Promise<Block> {
   const now = Date.now();
   const order = await env.DB.prepare(
     "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM blocks WHERE space_id = ?",
@@ -269,12 +277,17 @@ async function addBlock(env: Env, spaceId: string, body: Partial<Block>): Promis
   await env.DB.prepare("UPDATE spaces SET unread = 1, updated_at = ? WHERE id = ?")
     .bind(now, spaceId)
     .run();
-  await refreshSummary(env, spaceId);
+  await refreshSummary(env, spaceId, tz);
   await reindex(env, spaceId);
   return b;
 }
 
-async function patchBlock(env: Env, id: string, body: Partial<Block>): Promise<Block> {
+async function patchBlock(
+  env: Env,
+  id: string,
+  body: Partial<Block>,
+  tz?: string,
+): Promise<Block> {
   const now = Date.now();
   const fields: string[] = [];
   const vals: unknown[] = [];
@@ -293,17 +306,17 @@ async function patchBlock(env: Env, id: string, body: Partial<Block>): Promise<B
 
   const block = await env.DB.prepare("SELECT * FROM blocks WHERE id = ?").bind(id).first();
   const spaceId = (block as { space_id: string }).space_id;
-  await refreshSummary(env, spaceId);
+  await refreshSummary(env, spaceId, tz);
   await reindex(env, spaceId);
   return parseBlock(block as Record<string, unknown>);
 }
 
-async function deleteBlock(env: Env, id: string): Promise<{ ok: true }> {
+async function deleteBlock(env: Env, id: string, tz?: string): Promise<{ ok: true }> {
   const block = await env.DB.prepare("SELECT space_id FROM blocks WHERE id = ?").bind(id).first();
   await env.DB.prepare("DELETE FROM blocks WHERE id = ?").bind(id).run();
   if (block) {
     const spaceId = (block as { space_id: string }).space_id;
-    await refreshSummary(env, spaceId);
+    await refreshSummary(env, spaceId, tz);
     await reindex(env, spaceId);
   }
   return { ok: true };
@@ -311,13 +324,13 @@ async function deleteBlock(env: Env, id: string): Promise<{ ok: true }> {
 
 // ---- Living summary (spec §6: regenerate when blocks change) -------------
 
-async function refreshSummary(env: Env, spaceId: string): Promise<void> {
+async function refreshSummary(env: Env, spaceId: string, tz?: string): Promise<void> {
   const space = await loadOne(env, spaceId);
   if (!space) return;
   // AI summary when configured; deterministic heuristic otherwise (spec §6).
   let summary = heuristicSummary(space, Date.now());
   if (env.CLAUDE_API_KEY) {
-    const ai = await generateSummary(env, space).catch(() => null);
+    const ai = await generateSummary(env, space, tz).catch(() => null);
     if (ai) summary = ai;
   }
   await env.DB.prepare("UPDATE spaces SET summary = ? WHERE id = ?")
