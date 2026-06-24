@@ -178,6 +178,17 @@ body {
   background: linear-gradient(transparent, var(--bg) 32%);
   max-width: 920px; margin: 0 auto;
 }
+.crash {
+  max-width: 560px; margin: 14vh auto 0; padding: 24px; text-align: center;
+}
+.crash h2 { margin: 0 0 12px; }
+.crash p { color: var(--muted); font-size: 14px; }
+.crash pre, .load-error {
+  text-align: left; white-space: pre-wrap; word-break: break-word;
+  background: #3a1722; color: #ff9bb0; border: 1px solid #6e2438;
+  border-radius: 12px; padding: 10px 12px; font-size: 12px; margin: 12px 0;
+}
+.crash .btn-primary { margin-top: 8px; }
 .capture-error {
   margin-bottom: 8px; padding: 8px 12px; border-radius: 12px;
   background: #3a1722; color: #ff9bb0; border: 1px solid #6e2438;

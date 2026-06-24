@@ -15,6 +15,7 @@ export function App() {
   const [spaces, setSpaces] = useState<SpaceWithBlocks[]>([]);
   const [view, setView] = useState<View>("board");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [peekId, setPeekId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
@@ -24,9 +25,15 @@ export function App() {
   const nowRef = useRef<number>(Date.now());
 
   const load = useCallback(async (v: View = view) => {
-    const { spaces } = v === "archive" ? await api.archive() : await api.state();
-    setSpaces(spaces);
-    setLoading(false);
+    try {
+      setLoadError(null);
+      const { spaces } = v === "archive" ? await api.archive() : await api.state();
+      setSpaces(spaces);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Could not load");
+    } finally {
+      setLoading(false);
+    }
   }, [view]);
 
   useEffect(() => {
@@ -88,6 +95,11 @@ export function App() {
 
       {loading ? (
         <div className="empty">Reading the room…</div>
+      ) : loadError ? (
+        <div className="empty">
+          <p>Couldn’t reach your data.</p>
+          <pre className="load-error">{loadError}</pre>
+        </div>
       ) : spaces.length === 0 ? (
         <div className="empty">
           {view === "archive"
