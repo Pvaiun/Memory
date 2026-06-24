@@ -199,15 +199,16 @@ RIGHT NOW, as one short glanceable line (no markdown, no preamble). Lead with
 what is most urgent or time-sensitive. Be terse — this is read in a five-second
 glance. If there is nothing meaningful, reply with an empty string.
 The payload includes "today" (current local date) and "timezone" for judging
-what is urgent. Each block's due_date/event_date is given as a local date
-string like "2026-07-01 (Wednesday)".
+what is urgent. Each block has a short "ref" plus its due_date/event_date as a
+local date string like "2026-07-01 (Wednesday)".
 
-CRITICAL — dates: whenever you mention a date, output it ONLY as a token of the
-form [[YYYY-MM-DD]] using that block's calendar date. NEVER write a month name,
-and NEVER write relative words ("today", "tomorrow", "yesterday", "overdue",
-"in 3 days", "due now"). The app renders each token into live relative wording
-at read time, so relative words you write would become wrong tomorrow. Example
-output: "Call doctor [[2026-07-01]] · ask work about Claude sub [[2026-07-06]]".`;
+CRITICAL — dates: whenever you mention a block's date, output it ONLY as a token
+[[ref]] using that block's ref — e.g. "Call doctor [[a1b2c3d4]]". NEVER write a
+month name or a literal date, and NEVER write relative words ("today",
+"tomorrow", "yesterday", "overdue", "in 3 days", "due now"). The app resolves
+each [[ref]] to that block's current date and renders live relative wording, so
+it stays correct even if the date is later edited. Example output:
+"Call doctor [[a1b2c3d4]] · ask work about Claude sub [[9f8e7d6c]]".`;
 
 export async function generateSummary(
   env: Env,
@@ -222,6 +223,9 @@ export async function generateSummary(
     title: space.title,
     type: space.type,
     blocks: space.blocks.map((b) => ({
+      // Short stable handle the model copies into [[ref]] date tokens; the
+      // client resolves it back to this block to render the live date.
+      ref: b.id.slice(0, 8),
       type: b.type,
       content: b.content,
       completed: b.completed,

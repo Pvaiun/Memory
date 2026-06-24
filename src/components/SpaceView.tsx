@@ -79,7 +79,7 @@ export function SpaceView({ space, now, onClose, onChanged }: Props) {
           <button className="icon-btn" onClick={onClose}>✕</button>
         </div>
         {space.summary && (
-          <p className="space-summary">{applyDateTokens(space.summary, now)}</p>
+          <p className="space-summary">{applyDateTokens(space.summary, now, space.blocks)}</p>
         )}
 
         <ul className="block-list">

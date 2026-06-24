@@ -45,4 +45,22 @@ describe("applyDateTokens", () => {
   it("leaves text without tokens untouched", () => {
     expect(applyDateTokens("no dates here", at(2026, 6, 24))).toBe("no dates here");
   });
+
+  it("resolves [[ref]] tokens against the live blocks (stays current after edits)", () => {
+    const now = at(2026, 6, 24);
+    const blocks = [
+      { id: "a1b2c3d4-aaaa", due_date: at(2026, 6, 25), event_date: null },
+      { id: "9f8e7d6c-bbbb", due_date: null, event_date: at(2026, 7, 6) },
+    ];
+    expect(applyDateTokens("Call doctor [[a1b2c3d4]]", now, blocks)).toBe("Call doctor tomorrow");
+    expect(applyDateTokens("Sub [[9f8e7d6c]]", now, blocks)).toBe("Sub in 12 days");
+    // After a date edit the block's date changes; same token renders the new value.
+    const edited = [{ id: "a1b2c3d4-aaaa", due_date: at(2026, 6, 24), event_date: null }];
+    expect(applyDateTokens("Call doctor [[a1b2c3d4]]", now, edited)).toBe("Call doctor today");
+  });
+
+  it("drops a ref token whose block is gone or has no date", () => {
+    const now = at(2026, 6, 24);
+    expect(applyDateTokens("Gone [[deadbeef]]", now, [])).toBe("Gone ");
+  });
 });

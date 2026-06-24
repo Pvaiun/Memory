@@ -19,7 +19,7 @@ interface Props {
  */
 export function Peek({ space, scored, now, onClose, onOpenFully, onPin, onArchive }: Props) {
   const pinned = space.lifecycle === "pinned";
-  const summary = space.summary ? applyDateTokens(space.summary, now) : "";
+  const summary = space.summary ? applyDateTokens(space.summary, now, space.blocks) : "";
   return (
     <motion.div className="sheet-backdrop" onClick={onClose}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>

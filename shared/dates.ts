@@ -36,14 +36,35 @@ export function relativeDate(when: number, now: number): string {
 
 // Replace [[YYYY-MM-DD]] tokens (emitted by the AI summary) with live relative
 // wording. Anchored at local noon so the civil-day math can't flip on a DST or
-// midnight boundary. Unparseable tokens are stripped of their brackets.
-const TOKEN = /\[\[(\d{4})-(\d{2})-(\d{2})\]\]/g;
+// midnight boundary.
+//
+// A token comes in one of two forms:
+//   [[YYYY-MM-DD]]   — a literal date (legacy summaries / fallback)
+//   [[<id-prefix>]]  — a REFERENCE to a block; the live date is read from that
+//                      block at render time. This is what lets a date edit
+//                      update the summary with no AI regeneration: the block's
+//                      date changes, the token re-resolves, the wording updates.
+const TOKEN = /\[\[([^\]]+)\]\]/g;
+const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-export function applyDateTokens(text: string, now: number): string {
+interface DatedBlock {
+  id: string;
+  due_date: number | null;
+  event_date: number | null;
+}
+
+export function applyDateTokens(text: string, now: number, blocks?: DatedBlock[]): string {
   if (!text) return text;
-  return text.replace(TOKEN, (_m, y, mo, d) => {
-    const when = new Date(Number(y), Number(mo) - 1, Number(d), 12, 0, 0).getTime();
-    if (Number.isNaN(when)) return `${y}-${mo}-${d}`;
-    return relativeDate(when, now);
+  return text.replace(TOKEN, (_m, body) => {
+    const ref = String(body).trim();
+    const dm = ref.match(DATE_RE);
+    if (dm) {
+      const when = new Date(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3]), 12, 0, 0).getTime();
+      return Number.isNaN(when) ? ref : relativeDate(when, now);
+    }
+    // Block reference: read the date from the live block so it stays current.
+    const block = blocks?.find((b) => b.id.startsWith(ref));
+    const when = block ? block.due_date ?? block.event_date : null;
+    return when != null ? relativeDate(when, now) : "";
   });
 }

@@ -79,11 +79,11 @@ export function App() {
   useEffect(() => {
     if (resummarized.current || loading || loadError || spaces.length === 0) return;
     resummarized.current = true;
-    if (localStorage.getItem("resummarized_dates_v1")) return;
+    if (localStorage.getItem("resummarized_dates_v2")) return;
     api
       .resummarize()
       .then(() => {
-        localStorage.setItem("resummarized_dates_v1", "1");
+        localStorage.setItem("resummarized_dates_v2", "1");
         load(view);
       })
       .catch(() => {});

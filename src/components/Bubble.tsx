@@ -29,7 +29,7 @@ export function Bubble({ space, scored, archived, now, onPeek, onUnarchive }: Pr
   const { tier, charged, reason } = scored;
   // Date tokens in the cached summary are rendered to live wording here, so
   // "tomorrow" can never go stale (it's recomputed every render).
-  const summary = space.summary ? applyDateTokens(space.summary, now) : "";
+  const summary = space.summary ? applyDateTokens(space.summary, now, space.blocks) : "";
 
   return (
     <motion.button

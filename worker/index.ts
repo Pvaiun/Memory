@@ -314,8 +314,18 @@ async function patchBlock(
 
   const block = await env.DB.prepare("SELECT * FROM blocks WHERE id = ?").bind(id).first();
   const spaceId = (block as { space_id: string }).space_id;
-  await refreshSummary(env, spaceId, tz);
-  await reindex(env, spaceId);
+
+  // A pure date change does NOT alter the summary's wording or search text:
+  // summaries reference blocks by [[ref]] and the client renders the live date,
+  // so there is nothing to regenerate — skip the AI summary call entirely.
+  const dateOnly =
+    body.content == null &&
+    body.completed == null &&
+    (body.due_date !== undefined || body.event_date !== undefined);
+  if (!dateOnly) {
+    await refreshSummary(env, spaceId, tz);
+    await reindex(env, spaceId);
+  }
   return parseBlock(block as Record<string, unknown>);
 }
 
