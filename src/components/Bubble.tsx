@@ -1,10 +1,12 @@
 import { motion } from "framer-motion";
 import type { SpaceWithBlocks, Scored } from "../../shared/types";
+import { applyDateTokens } from "../../shared/dates";
 
 interface Props {
   space: SpaceWithBlocks;
   scored: Scored;
   archived: boolean;
+  now: number;
   onPeek: (id: string) => void;
   onUnarchive: (id: string) => void;
 }
@@ -23,8 +25,11 @@ const TYPE_GLYPH: Record<string, string> = {
  * the `layout` prop — when a Space changes tier it visibly grows/shrinks and
  * moves to its new place (the motion is information).
  */
-export function Bubble({ space, scored, archived, onPeek, onUnarchive }: Props) {
+export function Bubble({ space, scored, archived, now, onPeek, onUnarchive }: Props) {
   const { tier, charged, reason } = scored;
+  // Date tokens in the cached summary are rendered to live wording here, so
+  // "tomorrow" can never go stale (it's recomputed every render).
+  const summary = space.summary ? applyDateTokens(space.summary, now) : "";
 
   return (
     <motion.button
@@ -47,7 +52,7 @@ export function Bubble({ space, scored, archived, onPeek, onUnarchive }: Props) 
             <span className="bubble-title">{space.title}</span>
           </div>
           <div className="hero-summary">
-            {space.summary?.trim() || "Nothing pressing right now."}
+            {summary.trim() || "Nothing pressing right now."}
           </div>
           <div className="bubble-reason">{reason}</div>
         </>
@@ -57,7 +62,7 @@ export function Bubble({ space, scored, archived, onPeek, onUnarchive }: Props) 
             <span className="glyph">{TYPE_GLYPH[space.type] || "○"}</span>
             <span className="bubble-title">{space.title}</span>
           </div>
-          <div className="bubble-digest">{firstLine(space.summary) || reason}</div>
+          <div className="bubble-digest">{firstLine(summary) || reason}</div>
         </>
       ) : tier === "medium" ? (
         <span className="bubble-title">{space.title}</span>
@@ -72,7 +77,7 @@ export function Bubble({ space, scored, archived, onPeek, onUnarchive }: Props) 
   );
 }
 
-function firstLine(summary: string | null): string {
+function firstLine(summary: string): string {
   if (!summary) return "";
   const [first] = summary.split("•");
   return first.trim();

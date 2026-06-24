@@ -3,9 +3,11 @@ import { motion } from "framer-motion";
 import type { SpaceWithBlocks, Block, BlockType } from "../../shared/types";
 import { api } from "../api";
 import { blockLabel } from "../../shared/summary";
+import { applyDateTokens, relativeDate } from "../../shared/dates";
 
 interface Props {
   space: SpaceWithBlocks;
+  now: number;
   onClose: () => void;
   onChanged: () => void;
 }
@@ -17,7 +19,7 @@ const ADDABLE: BlockType[] = ["task", "fact", "note", "date", "contact", "checkl
  * hand is a memory-building ritual (the generation effect) that compensates for
  * the weak auditory channel, so it must be fast and pleasant — not a fallback.
  */
-export function SpaceView({ space, onClose, onChanged }: Props) {
+export function SpaceView({ space, now, onClose, onChanged }: Props) {
   const [adding, setAdding] = useState<BlockType | null>(null);
   const [draft, setDraft] = useState("");
   const [draftDate, setDraftDate] = useState("");
@@ -66,7 +68,9 @@ export function SpaceView({ space, onClose, onChanged }: Props) {
           <h2>{space.title}</h2>
           <button className="icon-btn" onClick={onClose}>✕</button>
         </div>
-        {space.summary && <p className="space-summary">{space.summary}</p>}
+        {space.summary && (
+          <p className="space-summary">{applyDateTokens(space.summary, now)}</p>
+        )}
 
         <ul className="block-list">
           {space.blocks.map((b) => (
@@ -79,8 +83,12 @@ export function SpaceView({ space, onClose, onChanged }: Props) {
                 />
               )}
               <span className="block-text">{blockLabel(b)}</span>
-              {b.due_date && <span className="block-date">due {fmt(b.due_date)}</span>}
-              {b.event_date && <span className="block-date">{fmt(b.event_date)}</span>}
+              {b.due_date && (
+                <span className="block-date">due {relativeDate(b.due_date, now)}</span>
+              )}
+              {b.event_date && (
+                <span className="block-date">{relativeDate(b.event_date, now)}</span>
+              )}
               <button className="block-del" onClick={() => remove(b)}>×</button>
             </li>
           ))}
@@ -150,8 +158,4 @@ function placeholderFor(type: BlockType): string {
     case "task": case "checklist_item": return "what needs doing";
     default: return "note…";
   }
-}
-
-function fmt(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }

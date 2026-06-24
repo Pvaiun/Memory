@@ -178,12 +178,16 @@ second brain. Write the top ~3 things the user needs to know about this Space
 RIGHT NOW, as one short glanceable line (no markdown, no preamble). Lead with
 what is most urgent or time-sensitive. Be terse — this is read in a five-second
 glance. If there is nothing meaningful, reply with an empty string.
-The payload includes "today" (current local date) and "timezone"; judge what is
-urgent or time-sensitive relative to that date, never any other assumption. Each
-block's due_date/event_date is given as an explicit local date string (e.g.
-"2026-07-01 (Wednesday)"). Use those dates EXACTLY — never recompute or shift
-them. If you mention a relative term like "overdue" or "tomorrow", it must agree
-with the given date and today; when unsure, just state the date.`;
+The payload includes "today" (current local date) and "timezone" for judging
+what is urgent. Each block's due_date/event_date is given as a local date
+string like "2026-07-01 (Wednesday)".
+
+CRITICAL — dates: whenever you mention a date, output it ONLY as a token of the
+form [[YYYY-MM-DD]] using that block's calendar date. NEVER write a month name,
+and NEVER write relative words ("today", "tomorrow", "yesterday", "overdue",
+"in 3 days", "due now"). The app renders each token into live relative wording
+at read time, so relative words you write would become wrong tomorrow. Example
+output: "Call doctor [[2026-07-01]] · ask work about Claude sub [[2026-07-06]]".`;
 
 export async function generateSummary(
   env: Env,

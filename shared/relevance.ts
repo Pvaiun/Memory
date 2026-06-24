@@ -11,6 +11,7 @@
 // (spec §3): no cron, no live recompute, exact to the moment of opening.
 
 import type { Block, SpaceWithBlocks, Scored, Tier } from "./types";
+import { relativeDate } from "./dates";
 
 const DAY = 86_400_000; // ms
 
@@ -179,19 +180,15 @@ function reasonForBlock(b: Block, now: number): string {
     return relativeDay(b.event_date, now, "event");
   }
   if ((b.type === "task" || b.type === "checklist_item") && !b.completed) {
-    if (b.due_date != null) {
-      return b.due_date < now ? "task overdue" : relativeDay(b.due_date, now, "due");
-    }
+    if (b.due_date != null) return relativeDay(b.due_date, now, "due");
     return "open task";
   }
   return "";
 }
 
+// Shared, live wording (shared/dates.ts) with a leading label, e.g. "due
+// tomorrow", "event in 3 days". Computed fresh on every render so it never
+// goes stale.
 function relativeDay(when: number, now: number, label: string): string {
-  const days = Math.round((when - now) / DAY);
-  if (days === 0) return `${label} today`;
-  if (days === 1) return `${label} tomorrow`;
-  if (days === -1) return `${label} yesterday`;
-  if (days < 0) return `${label} ${-days}d ago`;
-  return `${label} in ${days}d`;
+  return `${label} ${relativeDate(when, now)}`;
 }

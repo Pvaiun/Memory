@@ -76,6 +76,14 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
     return json(await createSpace(env, body));
   }
 
+  // POST /api/resummarize -> rebuild every Space's cached summary. Used once
+  // after the date-tokening change to refresh summaries frozen before it.
+  if (path === "/api/resummarize" && m === "POST") {
+    const spaces = await loadSpaces(env, false);
+    for (const s of spaces) await refreshSummary(env, s.id, tz);
+    return json({ ok: true, count: spaces.length });
+  }
+
   // POST /api/capture -> AI fast-dump proposal (does NOT auto-commit; spec §5)
   if (path === "/api/capture" && m === "POST") {
     const { text } = (await request.json()) as { text?: string };

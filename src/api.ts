@@ -54,4 +54,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ text }),
     }),
+
+  resummarize: () => req<{ ok: true; count: number }>("/resummarize", { method: "POST" }),
 };

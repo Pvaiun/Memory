@@ -21,8 +21,12 @@ export function App() {
   const [searching, setSearching] = useState(false);
 
   // Relevance is snapshotted at board mount and held stable for the session
-  // (spec §3: no live recompute, no jitter). `now` refreshes only on reload.
-  const nowRef = useRef<number>(Date.now());
+  // (spec §3: no live recompute, no jitter). `now` is a discrete snapshot —
+  // it changes only on load, view change, foregrounding, or a midnight
+  // rollover, never on a rolling timer — so the board never jitters while the
+  // user is looking, but priorities and date wording reset at the start of a
+  // new day with no cron and no AI call.
+  const [now, setNow] = useState<number>(() => Date.now());
 
   const load = useCallback(async (v: View = view) => {
     try {
@@ -37,17 +41,57 @@ export function App() {
   }, [view]);
 
   useEffect(() => {
-    nowRef.current = Date.now();
+    setNow(Date.now());
     load(view);
   }, [view, load]);
 
+  // Re-snapshot the clock + reload when the app returns to the foreground, and
+  // when the calendar day rolls over while it's left open. The interval only
+  // acts on an actual day change, so there is no per-minute re-render.
+  useEffect(() => {
+    const refresh = () => {
+      setNow(Date.now());
+      load(view);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    let lastDay = new Date().getDate();
+    const id = window.setInterval(() => {
+      const d = new Date().getDate();
+      if (d !== lastDay) {
+        lastDay = d;
+        refresh();
+      }
+    }, 60_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.clearInterval(id);
+    };
+  }, [view, load]);
+
+  // One-time: rebuild summaries written before date-tokening, so existing
+  // stale prose ("due tomorrow" frozen days ago) is replaced with live tokens.
+  const resummarized = useRef(false);
+  useEffect(() => {
+    if (resummarized.current || loading || loadError || spaces.length === 0) return;
+    resummarized.current = true;
+    if (localStorage.getItem("resummarized_dates_v1")) return;
+    api
+      .resummarize()
+      .then(() => {
+        localStorage.setItem("resummarized_dates_v1", "1");
+        load(view);
+      })
+      .catch(() => {});
+  }, [loading, loadError, spaces.length, load, view]);
+
   // Layout is a PURE function of (spaces, scores) — relevance stays separate
-  // from layout (spec §4). Recomputed against the frozen `now` so content
-  // changes animate, but the clock never causes jitter.
-  const scored = useMemo(
-    () => scoreSpaces(spaces, { now: nowRef.current }),
-    [spaces],
-  );
+  // from layout (spec §4). Recomputed against the snapshot `now`.
+  const scored = useMemo(() => scoreSpaces(spaces, { now }), [spaces, now]);
 
   const byId = useMemo(() => {
     const m = new Map<string, SpaceWithBlocks>();
@@ -111,6 +155,7 @@ export function App() {
           spaces={spaces}
           scored={scored}
           archived={view === "archive"}
+          now={now}
           onPeek={onPeek}
           onUnarchive={async (id) => {
             await api.patchSpace(id, { lifecycle: "active" });
@@ -122,7 +167,7 @@ export function App() {
       {view === "board" && (
         <CaptureBar
           onCommitted={() => {
-            nowRef.current = Date.now();
+            setNow(Date.now());
             load("board");
           }}
         />
@@ -134,6 +179,7 @@ export function App() {
             key="peek"
             space={peekSpace}
             scored={scored.find((s) => s.spaceId === peekSpace.id)}
+            now={now}
             onClose={() => setPeekId(null)}
             onOpenFully={() => {
               setOpenId(peekSpace.id);
@@ -159,6 +205,7 @@ export function App() {
           <SpaceView
             key="space"
             space={openSpace}
+            now={now}
             onClose={() => setOpenId(null)}
             onChanged={() => load(view)}
           />

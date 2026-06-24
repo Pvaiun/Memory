@@ -7,6 +7,7 @@ interface Props {
   spaces: SpaceWithBlocks[];
   scored: Scored[];
   archived: boolean;
+  now: number;
   onPeek: (id: string) => void;
   onUnarchive: (id: string) => void;
 }
@@ -16,7 +17,7 @@ interface Props {
  * first, size from tier. Relevance is double-encoded — reading order AND size
  * both point at the same thing. Reflow animates via framer-motion layout (FLIP).
  */
-export function Board({ spaces, scored, archived, onPeek, onUnarchive }: Props) {
+export function Board({ spaces, scored, archived, now, onPeek, onUnarchive }: Props) {
   const [showDormant, setShowDormant] = useState(false);
 
   const byId = new Map(spaces.map((s) => [s.id, s]));
@@ -38,6 +39,7 @@ export function Board({ spaces, scored, archived, onPeek, onUnarchive }: Props) 
               space={space}
               scored={sc}
               archived={archived}
+              now={now}
               onPeek={onPeek}
               onUnarchive={onUnarchive}
             />
@@ -59,6 +61,7 @@ export function Board({ spaces, scored, archived, onPeek, onUnarchive }: Props) 
                     space={space}
                     scored={sc}
                     archived={archived}
+                    now={now}
                     onPeek={onPeek}
                     onUnarchive={onUnarchive}
                   />

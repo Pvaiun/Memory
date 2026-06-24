@@ -1,9 +1,11 @@
 import { motion } from "framer-motion";
 import type { SpaceWithBlocks, Scored } from "../../shared/types";
+import { applyDateTokens } from "../../shared/dates";
 
 interface Props {
   space: SpaceWithBlocks;
   scored?: Scored;
+  now: number;
   onClose: () => void;
   onOpenFully: () => void;
   onPin: (pinned: boolean) => void;
@@ -15,8 +17,9 @@ interface Props {
  * place — checking the app is reading, not navigating in. "Open fully" lives
  * inside the peek. Reading already discharged the glow (handled in App).
  */
-export function Peek({ space, scored, onClose, onOpenFully, onPin, onArchive }: Props) {
+export function Peek({ space, scored, now, onClose, onOpenFully, onPin, onArchive }: Props) {
   const pinned = space.lifecycle === "pinned";
+  const summary = space.summary ? applyDateTokens(space.summary, now) : "";
   return (
     <motion.div className="sheet-backdrop" onClick={onClose}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -35,7 +38,7 @@ export function Peek({ space, scored, onClose, onOpenFully, onPin, onArchive }: 
         {scored && <div className="peek-reason">{scored.reason}</div>}
 
         <div className="peek-summary">
-          {space.summary?.trim() || "Nothing captured here yet."}
+          {summary.trim() || "Nothing captured here yet."}
         </div>
 
         <div className="peek-actions">
