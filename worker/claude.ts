@@ -65,6 +65,27 @@ function toEpoch(v: unknown): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
+// Format a stored epoch-ms as a human-readable LOCAL date, e.g.
+// "2026-07-01 (Wednesday)". The summary AI must never see raw epoch ms — it
+// misreads the integer and invents the wrong calendar date.
+function fmtDate(epoch: number | null | undefined, tz?: string): string | null {
+  if (epoch == null) return null;
+  const zone = tz || "UTC";
+  const d = new Date(epoch);
+  try {
+    const day = new Intl.DateTimeFormat("en-CA", {
+      timeZone: zone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+    const wd = new Intl.DateTimeFormat("en-GB", { timeZone: zone, weekday: "long" }).format(d);
+    return `${day} (${wd})`;
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}
+
 async function callClaude(
   env: Env,
   system: string,
@@ -158,7 +179,11 @@ RIGHT NOW, as one short glanceable line (no markdown, no preamble). Lead with
 what is most urgent or time-sensitive. Be terse — this is read in a five-second
 glance. If there is nothing meaningful, reply with an empty string.
 The payload includes "today" (current local date) and "timezone"; judge what is
-urgent or time-sensitive relative to that date, never any other assumption.`;
+urgent or time-sensitive relative to that date, never any other assumption. Each
+block's due_date/event_date is given as an explicit local date string (e.g.
+"2026-07-01 (Wednesday)"). Use those dates EXACTLY — never recompute or shift
+them. If you mention a relative term like "overdue" or "tomorrow", it must agree
+with the given date and today; when unsure, just state the date.`;
 
 export async function generateSummary(
   env: Env,
@@ -176,8 +201,9 @@ export async function generateSummary(
       type: b.type,
       content: b.content,
       completed: b.completed,
-      due_date: b.due_date,
-      event_date: b.event_date,
+      // Pre-formatted LOCAL dates so the model never converts epoch ms itself.
+      due_date: fmtDate(b.due_date, tz),
+      event_date: fmtDate(b.event_date, tz),
     })),
   });
   const out = await callClaude(env, SUMMARY_SYSTEM, payload, 200);
