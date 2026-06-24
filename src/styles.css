@@ -178,6 +178,11 @@ body {
   background: linear-gradient(transparent, var(--bg) 32%);
   max-width: 920px; margin: 0 auto;
 }
+.capture-error {
+  margin-bottom: 8px; padding: 8px 12px; border-radius: 12px;
+  background: #3a1722; color: #ff9bb0; border: 1px solid #6e2438;
+  font-size: 13px; line-height: 1.35; word-break: break-word;
+}
 .capture-row { display: flex; gap: 8px; align-items: center; }
 .capture-input {
   flex: 1; background: var(--panel); border: 1px solid var(--line);

@@ -17,6 +17,7 @@ interface Props {
 export function CaptureBar({ onCommitted }: Props) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [proposal, setProposal] = useState<CaptureProposal | null>(null);
   const [spaces, setSpaces] = useState<SpaceWithBlocks[]>([]);
   const [redirect, setRedirect] = useState(false);
@@ -26,10 +27,13 @@ export function CaptureBar({ onCommitted }: Props) {
     const t = text.trim();
     if (!t || busy) return;
     setBusy(true);
+    setError(null);
     try {
       const [{ proposal }, state] = await Promise.all([api.capture(t), api.state()]);
       setSpaces(state.spaces);
       setProposal(proposal);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Capture failed");
     } finally {
       setBusy(false);
     }
@@ -37,6 +41,7 @@ export function CaptureBar({ onCommitted }: Props) {
 
   async function commit(p: CaptureProposal) {
     setBusy(true);
+    setError(null);
     try {
       let spaceId: string;
       if ("existing_id" in p.target_space) {
@@ -56,6 +61,8 @@ export function CaptureBar({ onCommitted }: Props) {
       });
       reset();
       onCommitted();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Filing failed");
     } finally {
       setBusy(false);
     }
@@ -65,6 +72,7 @@ export function CaptureBar({ onCommitted }: Props) {
     setText("");
     setProposal(null);
     setRedirect(false);
+    setError(null);
   }
 
   return (
@@ -90,6 +98,12 @@ export function CaptureBar({ onCommitted }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {error && (
+        <div className="capture-error" role="alert">
+          {error}
+        </div>
+      )}
 
       <div className="capture-row">
         <input
