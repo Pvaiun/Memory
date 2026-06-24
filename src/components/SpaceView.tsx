@@ -23,12 +23,13 @@ export function SpaceView({ space, now, onClose, onChanged }: Props) {
   const [adding, setAdding] = useState<BlockType | null>(null);
   const [draft, setDraft] = useState("");
   const [draftDate, setDraftDate] = useState("");
+  const [editDateId, setEditDateId] = useState<string | null>(null);
 
   async function add() {
     if (!adding) return;
     const content = buildContent(adding, draft);
     if (!hasContent(content)) return;
-    const when = draftDate ? new Date(draftDate).getTime() : null;
+    const when = dateInputToEpoch(draftDate);
     await api.addBlock(space.id, {
       type: adding,
       content,
@@ -48,6 +49,15 @@ export function SpaceView({ space, now, onClose, onChanged }: Props) {
 
   async function remove(b: Block) {
     await api.deleteBlock(b.id);
+    onChanged();
+  }
+
+  // Inline date editing: tap a date (or "+ date") to change it. Writes the
+  // block's due_date (tasks) or event_date (date blocks); "" clears it.
+  async function saveDate(b: Block, value: string) {
+    const epoch = dateInputToEpoch(value);
+    await api.patchBlock(b.id, b.type === "date" ? { event_date: epoch } : { due_date: epoch });
+    setEditDateId(null);
     onChanged();
   }
 
@@ -83,12 +93,34 @@ export function SpaceView({ space, now, onClose, onChanged }: Props) {
                 />
               )}
               <span className="block-text">{blockLabel(b)}</span>
-              {b.due_date && (
-                <span className="block-date">due {relativeDate(b.due_date, now)}</span>
-              )}
-              {b.event_date && (
-                <span className="block-date">{relativeDate(b.event_date, now)}</span>
-              )}
+              {datedType(b.type) &&
+                (editDateId === b.id ? (
+                  <span className="block-date-edit">
+                    <input
+                      type="date"
+                      autoFocus
+                      className="date-input"
+                      defaultValue={dateField(b) != null ? epochToDateInput(dateField(b)!) : ""}
+                      onChange={(e) => saveDate(b, e.target.value)}
+                    />
+                    {dateField(b) != null && (
+                      <button className="link" onClick={() => saveDate(b, "")}>clear</button>
+                    )}
+                    <button className="link" onClick={() => setEditDateId(null)}>done</button>
+                  </span>
+                ) : dateField(b) != null ? (
+                  <button className="block-date" onClick={() => setEditDateId(b.id)}>
+                    {b.type === "date" ? "" : "due "}
+                    {relativeDate(dateField(b)!, now)}
+                  </button>
+                ) : (
+                  <button
+                    className="block-date block-date-add"
+                    onClick={() => setEditDateId(b.id)}
+                  >
+                    + date
+                  </button>
+                ))}
               <button className="block-del" onClick={() => remove(b)}>×</button>
             </li>
           ))}
@@ -128,6 +160,33 @@ export function SpaceView({ space, now, onClose, onChanged }: Props) {
       </motion.div>
     </motion.div>
   );
+}
+
+// Which blocks carry a date the user can edit.
+function datedType(t: BlockType): boolean {
+  return t === "task" || t === "checklist_item" || t === "date";
+}
+
+function dateField(b: Block): number | null {
+  return b.type === "date" ? b.event_date : b.due_date;
+}
+
+// A <input type="date"> value is "YYYY-MM-DD". Anchor at LOCAL noon so the
+// stored instant lands on the intended calendar day in the user's timezone
+// (new Date("YYYY-MM-DD") parses as UTC midnight and shifts the day west).
+function dateInputToEpoch(v: string): number | null {
+  if (!v) return null;
+  const [y, m, d] = v.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d, 12, 0, 0).getTime();
+}
+
+function epochToDateInput(epoch: number): string {
+  const d = new Date(epoch);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function buildContent(type: BlockType, draft: string): Record<string, unknown> {
