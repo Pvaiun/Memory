@@ -1,29 +1,40 @@
-# Cloudflare Worker: the API layer AND the Claude proxy (single backend).
+# Cloudflare Worker config (SCAFFOLD): API + Claude proxy + the Brain.
 name = "memory"
 main = "worker/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
-# The PWA is served as static assets from the same Worker. Non-/api requests
-# fall through to these assets; not_found_handling makes it a real SPA.
+# PWA served as static assets from the same Worker.
 [assets]
 directory = "./dist/client"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
-# D1 (SQLite) — the data store. Server-side, so the schema survives the
-# PWA -> native port untouched. Create with:
-#   wrangler d1 create memory
-# then paste the printed database_id below.
+# D1 (SQLite). Create with `wrangler d1 create memory`, paste the id below.
 [[d1_databases]]
 binding = "DB"
 database_name = "memory"
 database_id = "886eb3e6-5fc6-4b1c-8703-856b76103b57"
 
-# Secrets (set with `wrangler secret put <NAME>`):
-#   CLAUDE_API_KEY   the Claude API key. If unset, the app falls back to
-#                    deterministic capture + heuristic summaries.
-#   AUTH_TOKEN       optional single-user bearer token. If unset, the API is
-#                    open (fine for local dev / Cloudflare Access-fronted deploys).
 [vars]
 CLAUDE_MODEL = "claude-sonnet-4-6"
+
+# Daily Brain rebuild. Cron is UTC — pick a time that lands in the user's early
+# morning. TODO: confirm cadence/time with the user.
+[triggers]
+crons = ["0 11 * * *"]
+
+# --- Bindings to enable as features land --------------------------------------
+# Semantic search (worker/search.ts):
+#   [ai]
+#   binding = "AI"                       # Workers AI for embeddings
+#   [[vectorize]]
+#   binding = "VECTORIZE"
+#   index_name = "memory-content"        # wrangler vectorize create ...
+#
+# Secrets (wrangler secret put / dashboard):
+#   CLAUDE_API_KEY        enables smart capture + the Brain
+#   AUTH_TOKEN            optional single-user bearer token
+#   GOOGLE_CLIENT_ID      Google Calendar OAuth (worker/calendar.ts)
+#   GOOGLE_CLIENT_SECRET
+#   GOOGLE_REFRESH_TOKEN  one-time consent, stored server-side

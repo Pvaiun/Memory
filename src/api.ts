@@ -1,17 +1,17 @@
+// Typed fetch client (SCAFFOLD). Adds auth + timezone headers; calls the new
+// component/bubble/capture/search endpoints. Most return stubs for now.
+
 import type {
-  SpaceWithBlocks,
-  Space,
-  Block,
+  BubbleWithItems,
   CaptureProposal,
-  SpaceType,
-  Lifecycle,
+  ItemRef,
+  Task,
+  Goal,
+  Knowledge,
+  EventItem,
 } from "../shared/types";
 
-// Optional single-user bearer token, mirrors the Worker's AUTH_TOKEN.
 const TOKEN = import.meta.env.VITE_AUTH_TOKEN as string | undefined;
-
-// The device's IANA timezone, so the AI resolves relative dates ("next
-// Wednesday") against the user's local date rather than the Worker's UTC.
 const TZ = (() => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -30,30 +30,26 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  state: () => req<{ spaces: SpaceWithBlocks[] }>("/state"),
-  archive: () => req<{ spaces: SpaceWithBlocks[] }>("/archive"),
-  search: (q: string) =>
-    req<{ spaces: SpaceWithBlocks[] }>(`/search?q=${encodeURIComponent(q)}`),
+  // Board
+  bubbles: () => req<{ bubbles: BubbleWithItems[] }>("/bubbles"),
+  rebuildBubbles: () => req<{ ok: true; count: number }>("/bubbles/rebuild", { method: "POST" }),
+  patchBubble: (id: string, body: Partial<BubbleWithItems>) =>
+    req(`/bubbles/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
 
-  createSpace: (body: { title: string; type?: SpaceType; lifecycle?: Lifecycle }) =>
-    req<Space>("/spaces", { method: "POST", body: JSON.stringify(body) }),
-  patchSpace: (id: string, body: Partial<Space>) =>
-    req<Space>(`/spaces/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
-  deleteSpace: (id: string) =>
-    req<{ ok: true }>(`/spaces/${id}`, { method: "DELETE" }),
-
-  addBlock: (spaceId: string, body: Partial<Block>) =>
-    req<Block>(`/spaces/${spaceId}/blocks`, { method: "POST", body: JSON.stringify(body) }),
-  patchBlock: (id: string, body: Partial<Block>) =>
-    req<Block>(`/blocks/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
-  deleteBlock: (id: string) =>
-    req<{ ok: true }>(`/blocks/${id}`, { method: "DELETE" }),
-
+  // Capture
   capture: (text: string) =>
-    req<{ proposal: CaptureProposal }>("/capture", {
-      method: "POST",
-      body: JSON.stringify({ text }),
-    }),
+    req<{ proposal: CaptureProposal }>("/capture", { method: "POST", body: JSON.stringify({ text }) }),
+  commitCapture: (proposal: CaptureProposal) =>
+    req("/capture/commit", { method: "POST", body: JSON.stringify({ proposal }) }),
 
-  resummarize: () => req<{ ok: true; count: number }>("/resummarize", { method: "POST" }),
+  // Content components (secondary interfaces)
+  tasks: () => req<{ items: Task[] }>("/tasks"),
+  goals: () => req<{ items: Goal[] }>("/goals"),
+  knowledge: () => req<{ items: Knowledge[] }>("/knowledge"),
+  events: () => req<{ items: EventItem[] }>("/events"),
+  actGoal: (id: string) => req(`/goals/${id}/act`, { method: "POST" }),
+
+  // Search + calendar
+  search: (q: string) => req<{ results: ItemRef[] }>(`/search?q=${encodeURIComponent(q)}`),
+  syncCalendar: () => req("/calendar/sync", { method: "POST" }),
 };

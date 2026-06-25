@@ -1,46 +1,46 @@
 # CLAUDE.md
 
-Reference for how **Memory** works and how the codebase is organized.
+**This repository is a SCAFFOLD**, not a finished app. It was reshaped from a
+working single-user prototype into a starting point for the more robust design
+(the "Brain"-driven bubble board over normalized content components). Most logic
+is stubbed with `TODO`s; it is not expected to compile or run yet. This file is
+a map of the skeleton for the next implementer.
 
 ---
 
-## Overview
+## The shape of the system
 
-Memory is a personal, single-user contextual second brain delivered as a PWA.
-The home screen is a board of rounded bubbles, one per active **Space** — a
-context such as a project, person, or reference topic. Each bubble is sized and
-positioned by a relevance score computed from the Space's contents, so the
-largest, first bubble is whatever currently scores highest. A Space holds typed
-**blocks** (facts, tasks, checklist items, notes, contacts, dates) and a cached
-**living summary** that is shown on its bubble.
+Two layers:
 
-Content enters either through a fast-dump box, where an AI proposes which Space
-and block type a raw thought belongs to, or by editing a Space directly.
-Relevance, layout, and date wording are computed deterministically on the
-client; the AI is used only to file captures and to write the per-Space
-summaries.
+1. **Content components** — where the user's data actually lives, normalized:
+   - **tasks** (deadline or priority, category, recurring or one-shot)
+   - **goals** (ongoing, no deadline, "acted on" over time)
+   - **knowledge** (timeless, categorized, searchable)
+   - **events** (app-only or mirrored from Google Calendar)
 
-Three behaviours characterize the implementation:
-1. Relevance is deterministic and sets bubble size and position; the AI does not
-   affect layout.
-2. Living summaries are cached per Space and regenerated when a Space's blocks
-   change, not on every open.
-3. Dates run through a timezone-aware pipeline, with relative wording rendered
-   live on the client.
+2. **Bubbles** — the board. Bubbles do **not** store content; they **reference**
+   it (many-to-many), so one item can appear in several bubbles and a bubble can
+   lump items from different components into one actionable card. Bubbles are
+   built by **the Brain**.
+
+The two most important features (per the design) are **smart capture** and the
+**bubble board**; everything else is secondary.
 
 ---
 
-## Tech stack & architecture
+## What carried over from the prototype (reusable, not stubs)
 
-- **Frontend:** React 18 + Vite, TypeScript. Animations via **framer-motion**
-  (`layout`/`layoutId` for FLIP reflow on the board).
-- **Backend:** a single **Cloudflare Worker** (`worker/index.ts`) that is both
-  the API layer and the Claude proxy. Non-`/api` requests fall through to the
-  built PWA assets (served via the `ASSETS` binding, SPA mode).
-- **Data:** **Cloudflare D1** (SQLite), bound as `DB`.
-- **AI:** Claude via the Anthropic Messages API, called only from the Worker.
-  The API key is a Worker secret and does not reach the client.
-- **Deploy:** Cloudflare (Git-connected build, or `wrangler deploy`).
+- `shared/dates.ts` — timezone-aware relative date wording + `[[ref]]` token
+  rendering. Used as-is. (`shared/dates.test.ts` still passes.)
+- `worker/claude.ts` date helpers — `localDate`, `upcomingDays` (the 14-day
+  weekday lookup table), `toEpoch`, `fmtDate`. These solve relative-date
+  resolution correctly; reuse them.
+- `shared/signals.ts` — the prototype's relevance curves, repurposed as the
+  **deterministic, non-AI supplement** the design calls for (urgency/recency per
+  item; used to feed the Brain and to update bubble priority between AI runs).
+- Platform plumbing — single Worker (API + Claude proxy + cron), D1, the PWA
+  shell (`src/main.tsx`, `ErrorBoundary.tsx`, `styles.css`, `public/sw.js`),
+  bearer auth, and the build/deploy setup.
 
 ---
 
@@ -48,237 +48,87 @@ Three behaviours characterize the implementation:
 
 ```
 worker/
-  index.ts          API router + D1 data access (the backend)
-  claude.ts         Claude proxy: capture proposals + summary generation + date helpers
-  local-capture.ts  Deterministic fallback capture (used when no CLAUDE_API_KEY)
-shared/             Code imported by BOTH worker/ and src/
-  types.ts          Domain types (Space, Block, Scored, CaptureProposal, …)
-  relevance.ts      Deterministic relevance engine (scoreSpaces, blockUrgency)
-  summary.ts        Heuristic (non-AI) summary + blockLabel
-  dates.ts          Relative-date wording + summary date-token rendering
-  relevance.test.ts / dates.test.ts   vitest unit tests
+  index.ts      API router + the daily `scheduled()` Brain run. Most handlers stubbed.
+  claude.ts     Claude proxy + date helpers; smart capture (multi-item) proposal.
+  brain.ts      The Brain: AI bubble rebuild + deterministic interim updates + user profile.
+  calendar.ts   Google Calendar read/push (OAuth refresh-token flow). Stubs.
+  search.ts     Semantic search: embeddings + Vectorize. Stubs.
+shared/
+  types.ts      Content + bubble + capture types.
+  dates.ts      Relative date wording + token rendering (reused).
+  signals.ts    Deterministic per-item urgency/recency (the non-AI supplement).
+  dates.test.ts vitest (still valid).
 src/
-  main.tsx          Entry; mounts <App/> inside <ErrorBoundary/>; registers SW
-  App.tsx           Top-level state: load, relevance snapshot, peek/open/search
-  api.ts            Typed fetch client; adds auth + x-tz headers
-  ErrorBoundary.tsx Crash screen + one-tap "Reset app" (clears SW + caches)
+  App.tsx                 Board-first shell; capture; peek; search; library.
+  api.ts                  Typed client for the new endpoints.
   components/
-    Board.tsx       Relevance-ordered flow of bubbles (+ dormant collapse)
-    Bubble.tsx      One Space bubble; content varies by tier
-    CaptureBar.tsx  Fast-dump box; AI proposal confirm/redirect; voice button
-    Peek.tsx        Tap-a-bubble sheet: summary + pin/archive/open
-    SpaceView.tsx   Full Space: add/edit/complete/delete blocks; inline date edit
-    SearchOverlay.tsx  Debounced full-text search
-  styles.css
-schema.sql          D1 schema (run once per database)
-seed.sql            Optional sample data
-wrangler.toml       Worker config (bindings, vars)
+    Board.tsx             Priority-ordered flow of bubbles (FLIP reflow).
+    Bubble.tsx            One bubble: title + glanceable description + display vectors.
+    CaptureBar.tsx        Smart capture; multi-item proposal confirm.
+    Peek.tsx              Bubble detail: linked items + pin/dismiss.
+    SearchOverlay.tsx     Semantic search box.
+    ComponentsView.tsx    Secondary direct-edit interfaces (placeholder).
+  main.tsx, ErrorBoundary.tsx, styles.css   (reused)
+schema.sql      D1 schema: content tables + bubbles/bubble_items + user_profile + embeddings.
+wrangler.toml   Bindings, daily cron, and commented-out AI/Vectorize/Google config.
 ```
 
-`shared/` is imported by both runtimes and uses only cross-runtime APIs
-(`Intl`, `Date`) — no DOM-only or Node-only code.
+---
+
+## The Brain (`worker/brain.ts`) — the centerpiece, most design-open
+
+- **Full rebuild** (`rebuildBubbles`): an AI pass that builds the day's bubbles
+  from the whole context plus the persisted user profile. Expensive → intended
+  to run on a **daily cron** (`scheduled()` in `index.ts`; time in
+  `wrangler.toml`).
+- **Interim updates** (`applyInterimUpdates`): cheap, deterministic changes on
+  every content edit (deprioritize a bubble as items complete, spawn "New Today",
+  raise "due tonight") — no AI call. Uses `shared/signals.ts`.
+- **Deterministic fallback** (`deterministicBubbles`): a rules-only board so the
+  app is useful with no AI key.
+- **User profile** (`updateProfile`): a short AI-maintained recap so the Brain
+  isn't reasoning from scratch each run.
+
+Key open questions left for design (all flagged in code): rebuild cadence vs.
+freshness vs. cost; whether a separate "resurface" AI call is worth it; how much
+context to send the model; bubble lifetime/persistence; how pinned bubbles
+survive rebuilds.
 
 ---
 
-## Data model (D1 — `schema.sql`)
+## Proposed AI usage (for discussion — the design asks for this explicitly)
 
-**`spaces`**: `id` (uuid text), `title`, `type` (`project|person|reference|standalone`),
-`lifecycle` (`active|pinned|archived`), `pin_weight` (real), `summary` (text,
-nullable cached summary), `unread` (0/1 glow flag), `created_at`, `updated_at`,
-`accessed_at` (epoch ms).
+The design wants AI used deliberately, only where a deterministic algorithm
+can't do the job, with cost in mind. Current proposed AI touchpoints:
 
-**`blocks`**: `id`, `space_id` (fk, cascade delete), `type`
-(`fact|task|checklist_item|note|contact|date`), `content` (JSON text),
-`completed` (0/1, nullable — only tasks/checklist), `due_date` (epoch ms,
-nullable), `event_date` (epoch ms, nullable), `sort_order`, `created_at`,
-`updated_at`.
+1. **Smart capture** (`proposeCapture`) — interpret a casual/dictated dump into
+   structured items across components. *Hard to do without AI.* Cost: per
+   capture; cheapest model. Open: how much context to include; a deterministic
+   fast-path for obvious single-item dumps.
+2. **Brain bubble rebuild** (`rebuildBubbles`) — author/merge/prioritize the
+   board. *The main AI spend.* Cost: ~once daily. Deterministic signals feed it
+   and handle between-run updates so it isn't called per interaction.
+3. **User profile recap** (`updateProfile`) — optional; could be folded into the
+   daily rebuild rather than a separate call.
+4. **Search embeddings** (`search.ts`) — embedding model (far cheaper than chat),
+   on write only; querying is essentially free.
 
-**`search_index`**: FTS5 virtual table (`space_id`, `title`, `body`) for search.
-
-Fields the relevance engine queries (`completed`, `due_date`, `event_date`,
-`pin_weight`, timestamps, `unread`) are real columns, so the engine does not
-parse JSON; block-shape-specific data lives in the `content` JSON. All
-timestamps are **epoch milliseconds**. Types are in `shared/types.ts`.
-
----
-
-## API (all under `/api`, JSON)
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/api/state` | All non-archived Spaces with their blocks |
-| GET | `/api/archive` | Archived Spaces |
-| GET | `/api/search?q=` | FTS5 search (prefix-matched terms) |
-| POST | `/api/spaces` | Create a Space |
-| PATCH | `/api/spaces/:id` | Update title/type/lifecycle/pin/summary/unread |
-| DELETE | `/api/spaces/:id` | Delete a Space (cascades blocks) |
-| POST | `/api/spaces/:id/blocks` | Add a block |
-| PATCH | `/api/blocks/:id` | Update a block (content/completed/dates/order) |
-| DELETE | `/api/blocks/:id` | Delete a block |
-| POST | `/api/capture` | AI fast-dump → returns a `CaptureProposal` (does not commit) |
-| POST | `/api/resummarize` | Rebuild every Space's cached summary |
-
-Non-`/api` paths serve the PWA. Client calls go through `src/api.ts`, which sets
-`content-type`, the optional `Authorization: Bearer` header, and the `x-tz`
-header (see Date handling).
+Everything else — ordering math, interim bubble updates, date resolution — is
+deterministic on purpose.
 
 ---
 
-## Relevance engine (`shared/relevance.ts`)
+## Not yet started
 
-Deterministic. `scoreSpaces(spaces, {now})` returns `Scored[]` sorted by
-descending score, each with a `tier`, a `charged` flag (glow), and a
-human-readable `reason`.
-
-- Runs client-side (in `App.tsx`) against a snapshot `now`. Also used
-  server-side via the heuristic summary's urgency sort.
-- A Space's score = `pin` + `recencyBoost` + `max(blockUrgency over blocks)`.
-- `blockUrgency` is dispatched by block type:
-  - `date` → rises hyperbolically as `event_date` nears, peaks on the day,
-    decays after.
-  - `task`/`checklist_item` (incomplete): with `due_date` → date curve, and
-    escalates without decay once overdue; without `due_date` → escalates with
-    age since creation. Completed → 0.
-  - `fact`/`note`/`contact` → low flat baseline that does not change with age.
-- Score maps to tiers via thresholds (`tierActive`/`tierMedium`); `hero` is the
-  top 1–2 that also clear `heroFloor`. Constants live in `CONST`.
-
-Relevance is computed once per session against a frozen `now` and held stable
-while the user looks, then recomputed on discrete events: load, view switch,
-capture commit, app foreground, and calendar day rollover (see the `App.tsx`
-effects). There is no cron and nothing recomputes on a timer.
+Google Calendar sync, semantic search wiring, notifications, Android share
+target intake (`/share` route + manifest is declared), voice dictation, and the
+secondary component-editing UIs. Stubs and `TODO`s mark each.
 
 ---
 
-## Date handling
+## Build / deploy
 
-Dates pass through several stages:
-
-1. **Timezone reaches the server via a header.** `src/api.ts` sends `x-tz` (the
-   device IANA zone, e.g. `America/Toronto`) on every request. The Worker reads
-   it in `route()` and threads it into capture and summary functions. Dates are
-   resolved against this zone rather than the Worker's UTC.
-
-2. **Capture resolves dates by lookup.** In `worker/claude.ts`, `proposeCapture`
-   builds a human-readable local "today", the UTC offset, and a `calendar` array
-   of the next 14 days (`"Thursday 2026-06-25"`). The model looks up
-   weekday/relative references in that list rather than computing them (computed
-   weekday math is unreliable). The model returns dates as ISO strings including
-   the offset; `toEpoch()` converts them to epoch ms server-side.
-
-3. **Stored dates are epoch ms** (`due_date` / `event_date`).
-
-4. **Relative wording is rendered live on the client** (`shared/dates.ts`):
-   - `relativeDate(when, now)` → `today` / `tomorrow` / `yesterday` /
-     `in N days` / `N days ago` (under 2 weeks) / `in N weeks` (to ~2 months) /
-     `in N months`. Computed on civil-day boundaries in local time, so
-     "tomorrow" flips at midnight rather than on a rolling 24h clock.
-   - Used by block rows (`SpaceView`), bubble digests, and the peek reason, all
-     of which read live block data.
-
-5. **Summaries embed date references, not literal dates.** AI summaries emit
-   tokens that point at a block: `[[<id-prefix>]]` (the first 8 chars of the
-   block id). `applyDateTokens(text, now, blocks)` resolves each token against
-   the live blocks and renders the current relative wording. Because the date
-   lives on the block, editing a block's date updates the summary's date text on
-   next load without AI regeneration. A literal `[[YYYY-MM-DD]]` token is also
-   supported as a fallback for older summaries. The `<input type="date">` value
-   is anchored at local noon (`dateInputToEpoch` in `SpaceView.tsx`); a bare
-   `new Date("YYYY-MM-DD")` parses as UTC midnight and can shift the day west.
-
-Date displays go through `relativeDate` / `applyDateTokens` rather than
-formatting epoch ms directly.
-
----
-
-## Living summaries (`worker/claude.ts`, `shared/summary.ts`)
-
-- Cached in `spaces.summary`. Regenerated when a Space's blocks change
-  (add/edit/complete/delete), via `refreshSummary` in `worker/index.ts`.
-- With `CLAUDE_API_KEY` set, `generateSummary` produces an AI summary; without
-  it, `heuristicSummary` produces a deterministic one (top-N most-urgent block
-  labels). Layout does not block on the AI.
-- The summary prompt emits `[[ref]]` date tokens (see Date handling) and not
-  literal/relative dates.
-- Date-only block edits skip the AI: `patchBlock` detects a change touching only
-  `due_date`/`event_date` (no `content`/`completed`) and skips both
-  `refreshSummary` and reindex, since the summary's `[[ref]]` tokens re-resolve
-  client-side.
-- `/api/resummarize` rebuilds all summaries. `App.tsx` calls it once per device,
-  guarded by a `localStorage` flag (currently `resummarized_dates_v2`), so
-  existing summaries adopt the current token format.
-
----
-
-## Capture (`worker/claude.ts`, `CaptureBar.tsx`)
-
-- **Fast-dump:** `POST /api/capture` returns a `CaptureProposal` (target Space —
-  existing or new — block type, structured content, confidence). It does not
-  auto-commit; the client shows a one-tap confirm/redirect, then creates the
-  Space (if new) and the block. Low confidence is presented more tentatively.
-- **Manual:** a Space opened in `SpaceView` supports adding, editing, completing,
-  and deleting blocks directly, including inline date editing.
-- When the key is unset or the call fails, `local-capture.ts` produces a
-  deterministic proposal, so capture still returns.
-
----
-
-## Other behaviours
-
-- **Glow / unread:** new captures set `spaces.unread = 1` (drives the bubble
-  glow). Peeking/reading sets it back to 0 and stamps `accessed_at`. Access does
-  not affect relevance or position.
-- **Archive:** sets `lifecycle = 'archived'`, removing the Space from the board;
-  it remains searchable and visible in the archive view. Pin sets `lifecycle =
-  'pinned'` with `pin_weight`.
-- **Search:** FTS5 over title + block content + summary, prefix-matched per term.
-- **Service worker (`public/sw.js`):** network-first for HTML/navigations,
-  cache-first for hashed assets. (A cache-first shell can serve a stale
-  `index.html` referencing renamed bundles, producing a blank screen after a
-  deploy.) The cache name is `memory-shell-vN`.
-- **Error recovery:** `ErrorBoundary` shows a crash screen with a **Reset app**
-  button that unregisters the SW and clears caches.
-
----
-
-## Auth
-
-Single-user bearer token.
-- `AUTH_TOKEN` — runtime Worker secret; checked on every `/api` request.
-- `VITE_AUTH_TOKEN` — build-time variable, compiled into the client so it can
-  send `Authorization: Bearer`. Equals `AUTH_TOKEN`.
-- With both unset, the API is open. The token is embedded in the public bundle,
-  so it is not a strong secret.
-
----
-
-## Configuration, build & deploy
-
-**`wrangler.toml`**
-- `[[d1_databases]]` binding `DB`, `database_name = "memory"`, `database_id` set
-  to the real D1 id.
-- `[assets]` binding `ASSETS`, `directory = ./dist/client`, SPA not-found.
-- `[vars] CLAUDE_MODEL = "claude-sonnet-4-6"` — the model for all Claude calls;
-  a dashboard value overrides it, and the code falls back to `claude-sonnet-4-6`
-  if unset (`worker/claude.ts`).
-- Secrets (dashboard or `wrangler secret put`): `CLAUDE_API_KEY`, `AUTH_TOKEN`.
-
-**npm scripts**
-- `npm run dev` — Vite dev server (proxies `/api` to a local `wrangler dev` on
-  `:8787`).
-- `npm run build` — `tsc -b && vite build` → `dist/client`.
-- `npm run deploy` — build + `wrangler deploy`.
-- `npm run db:init:remote` / `db:init:local` — apply `schema.sql`.
-- `npm test` / `npm run typecheck` — vitest / TS check.
-
-Setup involves creating the D1 database, putting its id in `wrangler.toml`,
-applying the schema, setting `CLAUDE_API_KEY` (and `AUTH_TOKEN` /
-`VITE_AUTH_TOKEN` when using auth), then deploying.
-
----
-
-## Tests
-
-`shared/relevance.test.ts` and `shared/dates.test.ts` cover the deterministic
-relevance and date logic. `npm test` runs vitest; `npm run typecheck` runs the
-TypeScript build with no emit.
+Unchanged platform: `npm run dev` (Vite + `wrangler dev`), `npm run build`,
+`npm run deploy`, `npm run db:init:remote|local`, `npm test`, `npm run
+typecheck`. Note: as a scaffold it will not typecheck/build until the stubs are
+implemented.

@@ -1,16 +1,23 @@
 {
   "name": "Memory",
   "short_name": "Memory",
-  "description": "A personal contextual second brain.",
   "start_url": "/",
-  "scope": "/",
   "display": "standalone",
-  "background_color": "#0b0d12",
-  "theme_color": "#0b0d12",
-  "orientation": "portrait",
+  "background_color": "#0e0e12",
+  "theme_color": "#0e0e12",
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+    { "src": "/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" }
+  ],
+
+  "_comment_share_target": "Android share-target intake for smart capture. The OS POSTs shared text/links/images here; the app routes them into the capture flow. TODO: handle the /share route (and accept images once vision capture exists).",
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }

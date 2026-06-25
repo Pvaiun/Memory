@@ -1,26 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+// Search (SCAFFOLD). Semantic, not keyword: the user types a vague phrase and
+// the server returns the nearest content items by embedding similarity.
+
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import type { SpaceWithBlocks } from "../../shared/types";
+import type { ItemRef } from "../../shared/types";
 import { api } from "../api";
 
 interface Props {
   onClose: () => void;
-  onOpen: (id: string) => void;
 }
 
-/**
- * Search targeted retrieval of a specific dormant Space is a search
- * problem, not a spatial-memory one. Full-text across titles, block content,
- * and summaries — covers "that one thing I filed weeks ago".
- */
-export function SearchOverlay({ onClose, onOpen }: Props) {
+export function SearchOverlay({ onClose }: Props) {
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<SpaceWithBlocks[]>([]);
-  const ref = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    ref.current?.focus();
-  }, []);
+  const [results, setResults] = useState<ItemRef[]>([]);
 
   useEffect(() => {
     if (!q.trim()) {
@@ -28,43 +20,28 @@ export function SearchOverlay({ onClose, onOpen }: Props) {
       return;
     }
     const id = setTimeout(async () => {
-      const { spaces } = await api.search(q);
-      setResults(spaces);
-    }, 120);
+      try {
+        const { results } = await api.search(q);
+        setResults(results);
+      } catch {
+        /* ignore while typing */
+      }
+    }, 200);
     return () => clearTimeout(id);
   }, [q]);
 
   return (
-    <motion.div className="sheet-backdrop search-backdrop" onClick={onClose}
+    <motion.div className="sheet-backdrop" onClick={onClose}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.div
-        className="search-panel"
-        onClick={(e) => e.stopPropagation()}
-        initial={{ y: -30, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: -30, opacity: 0 }}
-      >
-        <input
-          ref={ref}
-          className="search-input"
-          placeholder="Search everything…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === "Escape" && onClose()}
-        />
-        <ul className="search-results">
-          {results.map((s) => (
-            <li key={s.id}>
-              <button onClick={() => onOpen(s.id)}>
-                <span className="chip">{s.type}</span>
-                <strong>{s.title}</strong>
-                {s.summary && <span className="search-snippet">{s.summary}</span>}
-              </button>
-            </li>
+      <motion.div className="search" onClick={(e) => e.stopPropagation()}
+        initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -20, opacity: 0 }}>
+        <input autoFocus className="capture-input" placeholder="Search by meaning…"
+          value={q} onChange={(e) => setQ(e.target.value)} />
+        {/* TODO: resolve each ItemRef to a real item and render it nicely. */}
+        <ul className="block-list">
+          {results.map((r) => (
+            <li key={`${r.type}:${r.id}`} className="block"><span className="block-text">{r.type}: {r.id}</span></li>
           ))}
-          {q.trim() && results.length === 0 && (
-            <li className="search-empty">No matches.</li>
-          )}
         </ul>
       </motion.div>
     </motion.div>

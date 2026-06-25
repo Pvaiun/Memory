@@ -1,75 +1,27 @@
-import { useState } from "react";
+// The board (SCAFFOLD): a relevance-ordered flow of bubbles. The Brain sets
+// each bubble's priority and display vectors; this just renders them. Reflow
+// animates via framer-motion layout (FLIP) — preserved from the previous app.
+
 import { LayoutGroup } from "framer-motion";
-import type { SpaceWithBlocks, Scored } from "../../shared/types";
+import type { BubbleWithItems } from "../../shared/types";
 import { Bubble } from "./Bubble";
 
 interface Props {
-  spaces: SpaceWithBlocks[];
-  scored: Scored[];
-  archived: boolean;
+  bubbles: BubbleWithItems[];
   now: number;
   onPeek: (id: string) => void;
-  onUnarchive: (id: string) => void;
 }
 
-/**
- * The surfacing board a single relevance-ordered flow, most-relevant
- * first, size from tier. Relevance is double-encoded — reading order AND size
- * both point at the same thing. Reflow animates via framer-motion layout (FLIP).
- */
-export function Board({ spaces, scored, archived, now, onPeek, onUnarchive }: Props) {
-  const [showDormant, setShowDormant] = useState(false);
-
-  const byId = new Map(spaces.map((s) => [s.id, s]));
-  // Descending relevance order (scoreSpaces already sorts).
-  const ordered = scored
-    .map((sc) => ({ sc, space: byId.get(sc.spaceId)! }))
-    .filter((x) => x.space);
-
-  const prominent = ordered.filter((x) => x.sc.tier !== "dormant");
-  const dormant = ordered.filter((x) => x.sc.tier === "dormant");
-
+export function Board({ bubbles, now, onPeek }: Props) {
+  const ordered = [...bubbles].sort((a, b) => b.priority - a.priority);
   return (
     <main className="board">
       <LayoutGroup>
         <div className="flow">
-          {prominent.map(({ sc, space }) => (
-            <Bubble
-              key={space.id}
-              space={space}
-              scored={sc}
-              archived={archived}
-              now={now}
-              onPeek={onPeek}
-              onUnarchive={onUnarchive}
-            />
+          {ordered.map((b) => (
+            <Bubble key={b.id} bubble={b} now={now} onPeek={onPeek} />
           ))}
         </div>
-
-        {/* Dormant circles fall to the end and collapse behind an affordance
-            so they don't clutter the glance. Reached via search. */}
-        {dormant.length > 0 && (
-          <div className="dormant-zone">
-            <button className="dormant-toggle" onClick={() => setShowDormant((v) => !v)}>
-              {showDormant ? "Hide" : `${dormant.length} dormant`}
-            </button>
-            {showDormant && (
-              <div className="flow dormant-flow">
-                {dormant.map(({ sc, space }) => (
-                  <Bubble
-                    key={space.id}
-                    space={space}
-                    scored={sc}
-                    archived={archived}
-                    now={now}
-                    onPeek={onPeek}
-                    onUnarchive={onUnarchive}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </LayoutGroup>
     </main>
   );
