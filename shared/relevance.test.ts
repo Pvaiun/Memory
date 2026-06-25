@@ -38,7 +38,7 @@ function space(p: Partial<SpaceWithBlocks>): SpaceWithBlocks {
   };
 }
 
-describe("the task / permanent split (spec §2)", () => {
+describe("the task / permanent split", () => {
   it("an undated task escalates with age", () => {
     const fresh = blockUrgency(block({ type: "task", created_at: NOW }), NOW);
     const old = blockUrgency(
@@ -64,7 +64,7 @@ describe("the task / permanent split (spec §2)", () => {
   });
 });
 
-describe("date proximity (spec §4.1)", () => {
+describe("date proximity", () => {
   it("rises as the event nears and peaks on the day", () => {
     const farOff = blockUrgency(block({ type: "date", event_date: NOW + 30 * DAY }), NOW);
     const soon = blockUrgency(block({ type: "date", event_date: NOW + 2 * DAY }), NOW);
@@ -80,7 +80,7 @@ describe("date proximity (spec §4.1)", () => {
   });
 });
 
-describe("overdue tasks keep climbing (spec §4)", () => {
+describe("overdue tasks keep climbing", () => {
   it("an overdue task outranks one merely due soon", () => {
     const dueSoon = blockUrgency(block({ type: "task", due_date: NOW + 1 * DAY }), NOW);
     const overdue = blockUrgency(block({ type: "task", due_date: NOW - 5 * DAY }), NOW);

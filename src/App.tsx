@@ -21,7 +21,7 @@ export function App() {
   const [searching, setSearching] = useState(false);
 
   // Relevance is snapshotted at board mount and held stable for the session
-  // (spec §3: no live recompute, no jitter). `now` is a discrete snapshot —
+  //. `now` is a discrete snapshot —
   // it changes only on load, view change, foregrounding, or a midnight
   // rollover, never on a rolling timer — so the board never jitters while the
   // user is looking, but priorities and date wording reset at the start of a
@@ -90,7 +90,7 @@ export function App() {
   }, [loading, loadError, spaces.length, load, view]);
 
   // Layout is a PURE function of (spaces, scores) — relevance stays separate
-  // from layout (spec §4). Recomputed against the snapshot `now`.
+  // from layout. Recomputed against the snapshot `now`.
   const scored = useMemo(() => scoreSpaces(spaces, { now }), [spaces, now]);
 
   const byId = useMemo(() => {
@@ -99,7 +99,7 @@ export function App() {
     return m;
   }, [spaces]);
 
-  // Reading discharges the glow (spec §4) without driving position (spec §10.7).
+  // Reading discharges the glow without driving position.
   const discharge = useCallback(async (id: string) => {
     const s = byId.get(id);
     if (s && s.unread === 1) {

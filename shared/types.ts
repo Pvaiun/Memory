@@ -49,13 +49,13 @@ export interface Scored {
   spaceId: string;
   score: number;
   tier: Tier;
-  /** Glow on when there is unread content (spec §4 charge/discharge). */
+  /** Glow on when there is unread content. */
   charged: boolean;
-  /** Human-readable reason the bubble sits where it does (spec §4: inspectable). */
+  /** Human-readable reason the bubble sits where it does. */
   reason: string;
 }
 
-// ---- AI capture contract (spec §5) -------------------------------------
+// ---- AI capture contract -------------------------------------
 
 export interface CaptureProposal {
   target_space:

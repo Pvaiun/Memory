@@ -1,7 +1,7 @@
-// The Claude proxy (spec §6, §8). All Claude API access lives here, server-side,
+// The Claude proxy. All Claude API access lives here, server-side,
 // behind the CLAUDE_API_KEY Worker secret. Both functions degrade gracefully:
 // if the key is unset or the call fails, the caller falls back to deterministic
-// behaviour so the layout never blocks on the AI (spec §6, §9).
+// behaviour so the layout never blocks on the AI.
 
 import type { Env } from "./index";
 import type { CaptureProposal, SpaceWithBlocks } from "../shared/types";
@@ -189,7 +189,7 @@ export async function proposeCapture(
     }
     return localPropose(text, spaces);
   } catch {
-    return localPropose(text, spaces); // never block capture on the AI (spec §5)
+    return localPropose(text, spaces); // never block capture on the AI
   }
 }
 

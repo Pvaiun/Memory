@@ -1,5 +1,5 @@
-// Memory — Cloudflare Worker: the API layer AND the Claude proxy (spec §8).
-// The Claude API key lives only as a Worker secret (spec §10.9). This same
+// Memory — Cloudflare Worker: the API layer AND the Claude proxy.
+// The Claude API key lives only as a Worker secret. This same
 // Worker is reused unchanged when the app is later wrapped natively.
 
 import type {
@@ -36,7 +36,7 @@ export default {
       return env.ASSETS.fetch(request); // serve the PWA
     }
 
-    // Single-user bearer auth — trivial by design (spec §8). No-op if unset.
+    // Single-user bearer auth — trivial by design. No-op if unset.
     if (env.AUTH_TOKEN) {
       const auth = request.headers.get("authorization") || "";
       if (auth !== `Bearer ${env.AUTH_TOKEN}`) return bad("unauthorized", 401);
@@ -54,7 +54,7 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
   const path = url.pathname;
   const m = request.method;
   // The client sends its IANA timezone so the AI resolves relative dates
-  // ("next Wednesday") against the user's local date, not UTC (spec §5).
+  // ("next Wednesday") against the user's local date, not UTC.
   const tz = request.headers.get("x-tz") || undefined;
 
   // GET /api/state  -> all non-archived spaces with their blocks
@@ -70,7 +70,7 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
     return json({ spaces: await search(env, url.searchParams.get("q") || "") });
   }
 
-  // POST /api/spaces  -> create a space (one-tap spin-up, spec §2)
+  // POST /api/spaces  -> create a space (one-tap spin-up)
   if (path === "/api/spaces" && m === "POST") {
     const body = (await request.json()) as Partial<Space>;
     return json(await createSpace(env, body));
@@ -84,7 +84,7 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
     return json({ ok: true, count: spaces.length });
   }
 
-  // POST /api/capture -> AI fast-dump proposal (does NOT auto-commit; spec §5)
+  // POST /api/capture -> AI fast-dump proposal (does NOT auto-commit)
   if (path === "/api/capture" && m === "POST") {
     const { text } = (await request.json()) as { text?: string };
     if (!text || !text.trim()) return bad("empty capture");
@@ -229,8 +229,8 @@ async function patchSpace(env: Env, id: string, body: Partial<Space>): Promise<S
   }
   if (body.pin_weight != null) set("pin_weight", body.pin_weight);
   if (body.summary != null) set("summary", body.summary);
-  // Reading discharges the glow (spec §4) and stamps access — but never drives
-  // position (spec §10.7).
+  // Reading discharges the glow and stamps access — but never drives
+  // position.
   if (body.unread != null) {
     set("unread", body.unread);
     if (body.unread === 0) set("accessed_at", now);
@@ -281,7 +281,7 @@ async function addBlock(
     )
     .run();
 
-  // New capture sets the glow (spec §4) and refreshes the cached summary.
+  // New capture sets the glow and refreshes the cached summary.
   await env.DB.prepare("UPDATE spaces SET unread = 1, updated_at = ? WHERE id = ?")
     .bind(now, spaceId)
     .run();
@@ -340,12 +340,12 @@ async function deleteBlock(env: Env, id: string, tz?: string): Promise<{ ok: tru
   return { ok: true };
 }
 
-// ---- Living summary (spec §6: regenerate when blocks change) -------------
+// ---- Living summary -------------
 
 async function refreshSummary(env: Env, spaceId: string, tz?: string): Promise<void> {
   const space = await loadOne(env, spaceId);
   if (!space) return;
-  // AI summary when configured; deterministic heuristic otherwise (spec §6).
+  // AI summary when configured; deterministic heuristic otherwise.
   let summary = heuristicSummary(space, Date.now());
   if (env.CLAUDE_API_KEY) {
     const ai = await generateSummary(env, space, tz).catch(() => null);
@@ -356,7 +356,7 @@ async function refreshSummary(env: Env, spaceId: string, tz?: string): Promise<v
     .run();
 }
 
-// ---- Search index (FTS5, spec §7) ---------------------------------------
+// ---- Search index (FTS5) ---------------------------------------
 
 async function reindex(env: Env, spaceId: string): Promise<void> {
   const space = await loadOne(env, spaceId);

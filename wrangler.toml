@@ -1,5 +1,4 @@
-# Cloudflare Worker: the API layer AND the Claude proxy (single backend, reused
-# unchanged when the app is later wrapped natively — see spec §8).
+# Cloudflare Worker: the API layer AND the Claude proxy (single backend).
 name = "memory"
 main = "worker/index.ts"
 compatibility_date = "2024-11-01"
@@ -21,11 +20,10 @@ binding = "DB"
 database_name = "memory"
 database_id = "886eb3e6-5fc6-4b1c-8703-856b76103b57"
 
-# Secrets (set with `wrangler secret put <NAME>` — never in client code):
-#   CLAUDE_API_KEY   the Claude API key (spec §10.9). If unset, the app falls
-#                    back to deterministic capture + heuristic summaries.
-#   AUTH_TOKEN       optional single-user bearer token (spec §8 "Do not
-#                    overbuild auth"). If unset, the API is open (fine for
-#                    local dev / Cloudflare Access-fronted deploys).
+# Secrets (set with `wrangler secret put <NAME>`):
+#   CLAUDE_API_KEY   the Claude API key. If unset, the app falls back to
+#                    deterministic capture + heuristic summaries.
+#   AUTH_TOKEN       optional single-user bearer token. If unset, the API is
+#                    open (fine for local dev / Cloudflare Access-fronted deploys).
 [vars]
 CLAUDE_MODEL = "claude-sonnet-4-6"

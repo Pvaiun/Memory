@@ -15,7 +15,7 @@ interface Props {
 const ADDABLE: BlockType[] = ["task", "fact", "note", "date", "contact", "checklist_item"];
 
 /**
- * Full Space view — the MANUAL capture path (spec §5). Placing information by
+ * Full Space view — the MANUAL capture path. Placing information by
  * hand is a memory-building ritual (the generation effect) that compensates for
  * the weak auditory channel, so it must be fast and pleasant — not a fallback.
  */

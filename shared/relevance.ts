@@ -1,36 +1,36 @@
-// The relevance engine (spec §4).
+// The relevance engine.
 //
 // Kept DELIBERATELY separate from layout: this produces a relevance score per
 // Space from a small set of legible, DETERMINISTIC rules. The AI never drives
-// position (spec §4, §10.2). Layout is then a pure function of (spaces, scores).
+// position. Layout is then a pure function of (spaces, scores).
 //
 // The engine is dispatched BY BLOCK TYPE because tasks and permanent facts have
-// opposite time-behaviour (spec §2): tasks escalate with age, facts never do.
+// opposite time-behaviour: tasks escalate with age, facts never do.
 //
 // Computed on read when the board mounts and held stable for the session
-// (spec §3): no cron, no live recompute, exact to the moment of opening.
+// no cron, no live recompute, exact to the moment of opening.
 
 import type { Block, SpaceWithBlocks, Scored, Tier } from "./types";
 import { relativeDate } from "./dates";
 
 const DAY = 86_400_000; // ms
 
-// Tunable constants (spec §11: "tune freely"). The score is on a ~0..100 scale.
+// Tunable constants. The score is on a ~0..100 scale.
 export const CONST = {
-  // Manual pin/boost — a primary input (spec §4.3), strong enough to lift a
+  // Manual pin/boost — a primary input, strong enough to lift a
   // Space into the Active/Hero range on its own.
   pinWeight: 55,
 
-  // Recency-of-capture boost: decays over days regardless of reading (spec §4).
+  // Recency-of-capture boost: decays over days regardless of reading.
   recencyMax: 35,
   recencyTauDays: 2.5, // exponential decay constant (~halves every ~1.7 days)
 
-  // Date/event proximity — the strongest signal (spec §4.1).
+  // Date/event proximity — the strongest signal.
   datePeak: 70,
   dateRiseScaleDays: 4, // hyperbolic rise: half-peak this many days out
   dateDecayTauDays: 2, // decay after the day has passed
 
-  // Tasks (spec §2: escalate with age).
+  // Tasks.
   taskBase: 22, // an open task is never silent
   taskAgeRatePerDay: 4, // grows with age-since-created (no due date)
   taskAgeCap: 50,
@@ -38,11 +38,11 @@ export const CONST = {
   overdueRatePerDay: 6,
   overdueCap: 95,
 
-  // Permanent info — low FLAT baseline, must NOT escalate with age (spec §2).
+  // Permanent info — low FLAT baseline, must NOT escalate with age.
   factBaseline: 6,
 
   // Tier thresholds (mapped from final score). Hero selection is additionally
-  // capped to the top 1–2 spaces in scoreSpaces() (spec §3).
+  // capped to the top 1–2 spaces in scoreSpaces().
   tierActive: 45,
   tierMedium: 18,
   // below tierMedium => dormant
@@ -51,7 +51,7 @@ export const CONST = {
   heroFloor: 60,
 } as const;
 
-/** Hyperbolic rise as the event nears, exponential decay after (spec §4.1). */
+/** Hyperbolic rise as the event nears, exponential decay after. */
 function dateUrgency(eventDate: number, now: number): number {
   const days = (eventDate - now) / DAY;
   if (days >= 0) {
@@ -62,7 +62,7 @@ function dateUrgency(eventDate: number, now: number): number {
   return CONST.datePeak * Math.exp(days / CONST.dateDecayTauDays);
 }
 
-/** Urgency of a single block, dispatched by type (spec §4 scoring sketch). */
+/** Urgency of a single block, dispatched by type. */
 export function blockUrgency(block: Block, now: number): number {
   switch (block.type) {
     case "date":
@@ -70,11 +70,11 @@ export function blockUrgency(block: Block, now: number): number {
 
     case "task":
     case "checklist_item": {
-      if (block.completed) return 0; // completed tasks disappear (spec §2)
+      if (block.completed) return 0; // completed tasks disappear
       if (block.due_date != null) {
         const days = (block.due_date - now) / DAY;
         if (days < 0) {
-          // Overdue: escalate (do NOT decay) — spec §4 "escalates if overdue".
+          // Overdue: escalate (do NOT decay).
           const overdueDays = -days;
           return Math.min(
             CONST.overdueCap,
@@ -84,7 +84,7 @@ export function blockUrgency(block: Block, now: number): number {
         // Upcoming due date follows the date curve.
         return dateUrgency(block.due_date, now);
       }
-      // No due date: escalate with age-since-created (spec §2 task split).
+      // No due date: escalate with age-since-created.
       const ageDays = (now - block.created_at) / DAY;
       return Math.min(
         CONST.taskAgeCap,
@@ -96,7 +96,7 @@ export function blockUrgency(block: Block, now: number): number {
     case "note":
     case "contact":
     default:
-      // Permanent info: low flat baseline; never louder with age (spec §2, §10.6).
+      // Permanent info: low flat baseline; never louder with age.
       return CONST.factBaseline;
   }
 }
@@ -121,8 +121,8 @@ export interface ScoreOptions {
 
 /**
  * Score every active/pinned Space and assign tiers. Archived Spaces are
- * excluded from the board (spec §2). Returns descending-by-score (the board is
- * a single relevance-ordered flow, spec §3).
+ * excluded from the board. Returns descending-by-score (the board is
+ * a single relevance-ordered flow).
  */
 export function scoreSpaces(
   spaces: SpaceWithBlocks[],
@@ -133,7 +133,7 @@ export function scoreSpaces(
   const scored = spaces
     .filter((s) => s.lifecycle !== "archived")
     .map((s) => {
-      // A Space's prominence tracks its HOTTEST block (spec §4).
+      // A Space's prominence tracks its HOTTEST block.
       let hottest = 0;
       let hotReason = "";
       for (const b of s.blocks) {
@@ -166,8 +166,7 @@ export function scoreSpaces(
     })
     .sort((a, b) => b.score - a.score);
 
-  // Hero selection: top 1–2 that clear the floor (spec §3: "usually 1,
-  // occasionally 2"). Promotion is deterministic, never AI-driven.
+  // Hero selection: top 1–2 that clear the floor. Promotion is deterministic, never AI-driven.
   for (let i = 0; i < scored.length && i < 2; i++) {
     if (scored[i].score >= CONST.heroFloor) scored[i].tier = "hero";
   }

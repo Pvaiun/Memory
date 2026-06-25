@@ -13,7 +13,7 @@ interface Props {
 }
 
 /**
- * The peek (spec §3): tapping a bubble shows the Space's living summary in
+ * The peek tapping a bubble shows the Space's living summary in
  * place — checking the app is reading, not navigating in. "Open fully" lives
  * inside the peek. Reading already discharged the glow (handled in App).
  */

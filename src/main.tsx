@@ -12,7 +12,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   </React.StrictMode>,
 );
 
-// Register the service worker so the app installs to the home screen (spec §8).
+// Register the service worker so the app installs to the home screen.
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});

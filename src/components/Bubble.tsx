@@ -19,9 +19,9 @@ const TYPE_GLYPH: Record<string, string> = {
 };
 
 /**
- * One bubble per active Space. Shape and size encode state (spec §3): rounded
+ * One bubble per active Space. Shape and size encode state rounded
  * forms only (no hard rectangles), prominence in discrete tiers, glow when
- * charged. The WHOLE bubble is the tap target (spec §3). Reflow animates via
+ * charged. The WHOLE bubble is the tap target. Reflow animates via
  * the `layout` prop — when a Space changes tier it visibly grows/shrinks and
  * moves to its new place (the motion is information).
  */

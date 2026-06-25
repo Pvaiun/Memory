@@ -8,11 +8,10 @@ interface Props {
 }
 
 /**
- * Fast dump (spec §5): one always-available box. The AI proposes a target Space,
- * block type, and structured content; the user confirms or redirects in a single
- * tap. The AI auto-files to a good-enough home — nothing is forced into a triage
- * queue (spec §5, §10.5). Capture latency is the app's most important metric
- * (spec §1), so the box is always mounted and submits optimistically.
+ * Fast dump: one always-available box. The AI proposes a target Space, block
+ * type, and structured content; the user confirms or redirects in a single tap.
+ * The AI auto-files to a good-enough home — nothing is forced into a triage
+ * queue. The box is always mounted and submits optimistically.
  */
 export function CaptureBar({ onCommitted }: Props) {
   const [text, setText] = useState("");
@@ -148,7 +147,7 @@ function ProposalCard({
     "existing_id" in target
       ? spaces.find((s) => s.id === target.existing_id)?.title || "a Space"
       : `New: ${target.new.title}`;
-  const tentative = proposal.confidence < 0.5; // present low confidence gently (spec §5)
+  const tentative = proposal.confidence < 0.5; // present low confidence gently
 
   return (
     <div className={`proposal-card ${tentative ? "tentative" : ""}`}>
@@ -212,7 +211,7 @@ function previewContent(p: CaptureProposal): string {
   return JSON.stringify(c);
 }
 
-// Voice capture via the Web Speech API (spec §5: optional, available in the PWA).
+// Voice capture via the Web Speech API.
 function VoiceButton({ onText }: { onText: (t: string) => void }) {
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);

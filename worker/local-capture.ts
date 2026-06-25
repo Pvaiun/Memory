@@ -1,7 +1,7 @@
-// Deterministic capture fallback (spec §5, §9): a good-enough auto-file when
+// Deterministic capture fallback: a good-enough auto-file when
 // CLAUDE_API_KEY is unset or the AI call fails. Never blocks capture; the user
 // still gets a one-tap confirm/redirect on the client. Confidence is kept
-// modest so the client presents it tentatively (spec §5).
+// modest so the client presents it tentatively.
 
 import type { CaptureProposal, BlockType, SpaceWithBlocks } from "../shared/types";
 

@@ -1,4 +1,4 @@
-// Deterministic heuristic living summary (spec §6).
+// Deterministic heuristic living summary.
 //
 // Phase-1 fallback: the most-urgent / most-recent N items, so the board layout
 // can be validated WITHOUT the AI dependency. The Worker swaps in an
@@ -43,7 +43,7 @@ export function blockLabel(b: Block): string {
   }
 }
 
-/** Top ~3 things to know right now, urgency-first (spec §6 Hero content). */
+/** Top ~3 things to know right now, urgency-first. */
 export function heuristicSummary(space: SpaceWithBlocks, now: number): string {
   const open = space.blocks.filter(
     (b) => !((b.type === "task" || b.type === "checklist_item") && b.completed),

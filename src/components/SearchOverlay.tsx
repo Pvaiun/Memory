@@ -9,7 +9,7 @@ interface Props {
 }
 
 /**
- * Search (spec §7): targeted retrieval of a specific dormant Space is a search
+ * Search targeted retrieval of a specific dormant Space is a search
  * problem, not a spatial-memory one. Full-text across titles, block content,
  * and summaries — covers "that one thing I filed weeks ago".
  */

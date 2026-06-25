@@ -7,7 +7,7 @@ import type {
   Lifecycle,
 } from "../shared/types";
 
-// Optional single-user bearer token, mirrors the Worker's AUTH_TOKEN (spec §8).
+// Optional single-user bearer token, mirrors the Worker's AUTH_TOKEN.
 const TOKEN = import.meta.env.VITE_AUTH_TOKEN as string | undefined;
 
 // The device's IANA timezone, so the AI resolves relative dates ("next

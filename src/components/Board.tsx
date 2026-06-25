@@ -13,7 +13,7 @@ interface Props {
 }
 
 /**
- * The surfacing board (spec §3): a single relevance-ordered flow, most-relevant
+ * The surfacing board a single relevance-ordered flow, most-relevant
  * first, size from tier. Relevance is double-encoded — reading order AND size
  * both point at the same thing. Reflow animates via framer-motion layout (FLIP).
  */
@@ -47,7 +47,7 @@ export function Board({ spaces, scored, archived, now, onPeek, onUnarchive }: Pr
         </div>
 
         {/* Dormant circles fall to the end and collapse behind an affordance
-            so they don't clutter the glance (spec §3). Reached via search. */}
+            so they don't clutter the glance. Reached via search. */}
         {dormant.length > 0 && (
           <div className="dormant-zone">
             <button className="dormant-toggle" onClick={() => setShowDormant((v) => !v)}>
